@@ -1,0 +1,112 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  python-checks:
+    name: Python checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Security audit
+        run: uv run pip-audit
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Type check
+        run: uv run mypy . --ignore-missing-imports
+
+      - name: Tests with coverage
+        run: uv run pytest tests/ --cov --cov-report=term-missing --cov-fail-under=80 -x
+
+  frontend-checks:
+    name: Frontend checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+  deploy:
+    name: Deploy to Railway
+    needs: [python-checks, frontend-checks]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      # Railway deploys automatically via GitHub integration.
+      # This step exists for explicit webhook-based deploys if needed.
+      - name: Trigger Railway deploy
+        if: env.RAILWAY_DEPLOY_WEBHOOK != ''
+        env:
+          RAILWAY_DEPLOY_WEBHOOK: ${{ secrets.RAILWAY_DEPLOY_WEBHOOK }}
+        run: |
+          curl -sf -X POST "$RAILWAY_DEPLOY_WEBHOOK" --max-time 30
+
+  smoke-tests:
+    name: E2E smoke tests
+    needs: [deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for deployment
+        run: sleep 30
+
+      - name: Health check
+        env:
+          API_URL: ${{ secrets.RAILWAY_API_URL }}
+        run: |
+          curl -sf "${API_URL}/api/health" | jq .status
+
+      - name: Quality endpoint check
+        env:
+          API_URL: ${{ secrets.RAILWAY_API_URL }}
+        run: |
+          curl -sf "${API_URL}/api/quality/latest" | jq .status
+
+  notify-failure:
+    name: Notify on failure
+    needs: [smoke-tests]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create failure issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Deploy failed: ${context.sha.substring(0, 7)}`,
+              body: `Deploy workflow failed for commit ${context.sha}.\n\n[View run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+              labels: ['deploy-failure'],
+            });

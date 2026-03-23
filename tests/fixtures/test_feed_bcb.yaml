@@ -1,0 +1,52 @@
+feed_id: test_bcb
+name: "Test BCB Feed"
+version: "1.0.0"
+status: active
+
+source:
+  type: api
+  url: "https://api.bcb.gov.br/test"
+  format: json
+  auth_method: none
+  rate_limit_rpm: 30
+
+schema_fields:
+  - name: data
+    source_field: data
+    type: string
+    required: true
+    description: "Date"
+    silver_type: DATE
+    silver_expression: "strptime(\"{col}\", '%d/%m/%Y')"
+  - name: valor
+    source_field: valor
+    type: string
+    required: true
+    description: "Value"
+    silver_type: DOUBLE
+    silver_expression: "CAST(\"{col}\" AS DOUBLE)"
+
+processing:
+  bronze:
+    write_mode: append
+    rescued_data_column: "_rescued_data"
+  silver:
+    processing_type: latest_only
+    primary_key:
+      - series
+      - date
+    dedup_columns:
+      - date
+    dedup_order_by: "_ingested_at DESC"
+
+quality:
+  bronze:
+    max_null_rate: 0.02
+    min_row_count: 1
+    max_rescued_data_rate: 0.10
+
+metadata:
+  unit: "%"
+  tags:
+    - test
+  domain: test

@@ -1,0 +1,94 @@
+name: Daily Pipeline
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # 06:00 UTC daily
+  workflow_dispatch:
+    inputs:
+      backfill:
+        description: "Fetch full historical data instead of daily delta"
+        type: boolean
+        default: false
+
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+
+jobs:
+  run-pipeline:
+    name: Run data pipeline
+    runs-on: ubuntu-latest
+    env:
+      STORAGE_BACKEND: r2
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Run pipeline
+        run: uv run python -m pipeline.flow ${{ inputs.backfill == true && '--backfill' || '' }}
+
+      - name: Trigger Railway gold sync
+        env:
+          RAILWAY_API_URL: ${{ secrets.RAILWAY_API_URL }}
+          SYNC_WEBHOOK_SECRET: ${{ secrets.SYNC_WEBHOOK_SECRET }}
+        run: |
+          curl -sf -X POST "${RAILWAY_API_URL}/api/internal/sync" \
+            -H "Authorization: Bearer ${SYNC_WEBHOOK_SECRET}" \
+            --max-time 60
+
+      - name: Download quality report from R2
+        if: always()
+        run: |
+          mkdir -p artifacts/quality
+          uv run python -c "
+          import asyncio, json
+          from storage.r2 import R2StorageBackend
+          async def main():
+              r2 = R2StorageBackend()
+              keys = await r2.list_keys('quality/')
+              # Find the latest report
+              reports = sorted([k for k in keys if k.endswith('report.json')])
+              if reports:
+                  data = await r2.read(reports[-1])
+                  with open('artifacts/quality/report.json', 'wb') as f:
+                      f.write(data)
+                  print(f'Downloaded {reports[-1]}')
+              else:
+                  print('No quality reports found')
+          asyncio.run(main())
+          "
+
+      - name: Upload quality report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quality-report-${{ github.run_id }}
+          path: artifacts/quality/
+          retention-days: 30
+
+  notify-failure:
+    name: Notify on failure
+    needs: [run-pipeline]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create failure issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Pipeline failed: ${new Date().toISOString().split('T')[0]}`,
+              body: `Daily pipeline run failed.\n\n[View run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+              labels: ['pipeline-failure'],
+            });

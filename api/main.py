@@ -12,6 +12,7 @@ from typing import Any
 from uuid import uuid4
 
 import asyncpg
+import sentry_sdk
 import structlog
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -52,9 +53,19 @@ _SESSION_COOKIE_NAME = "br_ep_session"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Load environment variables on startup."""
+    """Load environment variables and initialize Sentry on startup."""
     load_dotenv(".env.local")
     load_dotenv()
+
+    sentry_dsn = os.environ.get("SENTRY_DSN_API", "")
+    if sentry_dsn:
+        sentry_sdk.init(
+            dsn=sentry_dsn,
+            environment=os.environ.get("APP_ENV", "development"),
+            traces_sample_rate=0.1,
+            send_default_pii=False,
+        )
+
     logger.info("app_started", env=os.environ.get("APP_ENV", "unknown"))
     yield
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { SERIES, type TimeRange } from '@/lib/api';
 import { MetricCard } from '@/components/MetricCard';
 import { InsightDigest } from '@/components/InsightDigest';
@@ -57,9 +58,9 @@ export function Dashboard() {
       <footer className="mt-12 py-6 border-t border-slate-800 text-center text-xs text-slate-600">
         <p>
           {t.hero.dataSourceFooter}{' '}
-          <a href="/quality" className="text-brand-500 hover:text-brand-400">
+          <Link to="/quality" className="text-brand-500 hover:text-brand-400">
             {t.hero.dataQualityLink}
-          </a>
+          </Link>
         </p>
       </footer>
     </div>

@@ -36,7 +36,7 @@ export function AboutPage() {
               {/* Medallion Pipeline */}
               <div className="rounded-lg border border-slate-700/50 bg-slate-900/60 p-4">
                 <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-3">Medallion Pipeline</p>
-                <div className="flex items-center gap-1.5 text-xs">
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
                   <span className="rounded bg-amber-500/15 border border-amber-500/25 px-2 py-1 text-amber-400">Bronze</span>
                   <span className="text-slate-600">&rarr;</span>
                   <span className="rounded bg-slate-500/15 border border-slate-500/25 px-2 py-1 text-slate-300">Silver</span>
@@ -44,6 +44,7 @@ export function AboutPage() {
                   <span className="rounded bg-yellow-500/15 border border-yellow-500/25 px-2 py-1 text-yellow-400">Gold</span>
                 </div>
                 <p className="text-[10px] text-slate-600 mt-2">raw &rarr; clean &rarr; aggregated</p>
+                <p className="text-[10px] text-slate-600 mt-1">Stored on Cloudflare R2</p>
               </div>
 
               {/* API Layer */}

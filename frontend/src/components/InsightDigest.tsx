@@ -1,4 +1,6 @@
+import Markdown from 'react-markdown';
 import { useInsights } from '@/hooks/useMetrics';
+import { useLanguage } from '@/lib/LanguageContext';
 
 function formatTimestamp(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', {
@@ -12,16 +14,17 @@ function formatTimestamp(iso: string): string {
 
 export function InsightDigest() {
   const { data, isLoading, isError } = useInsights();
+  const { language, t } = useLanguage();
 
   const insights = data?.insights ?? [];
-  const englishInsight = insights.find((i) => i.language === 'en') ?? insights[0];
+  const insight = insights.find((i) => i.language === language) ?? insights.find((i) => i.language === 'en') ?? insights[0];
 
   return (
     <section className="rounded-xl border border-slate-700/50 bg-slate-800/50 p-6">
       <div className="flex items-center gap-2 mb-4">
         <div className="h-2 w-2 rounded-full bg-brand-500 animate-pulse" />
         <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
-          AI Insight Digest
+          {t.insight.title}
         </h2>
       </div>
 
@@ -38,48 +41,45 @@ export function InsightDigest() {
         </p>
       )}
 
-      {!isLoading && !isError && !englishInsight && (
+      {!isLoading && !isError && !insight && (
         <div className="space-y-3 text-sm text-slate-400">
-          <p>
-            No insights available yet. The InsightAgent will generate daily
-            summaries of key economic indicators once data is available.
-          </p>
+          <p>{t.insight.noData}</p>
           <div className="flex items-center gap-2 text-xs text-slate-600">
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-slate-600" />
-            Powered by Claude Sonnet
+            {t.insight.poweredBy} Claude Sonnet
           </div>
         </div>
       )}
 
-      {!isLoading && !isError && englishInsight && (
+      {!isLoading && !isError && insight && (
         <div className="space-y-3">
-          <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-line">
-            {englishInsight.content}
-          </p>
+          <div className="text-sm text-slate-300 leading-relaxed prose prose-invert prose-sm max-w-none prose-p:my-1 prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0">
+            <Markdown>{insight.content}</Markdown>
+          </div>
 
           <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-            {englishInsight.confidence_flag ? (
+            {insight.confidence_flag ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 font-semibold uppercase tracking-wider text-[10px]">
-                High confidence
+                {t.insight.highConfidence}
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-2 py-0.5 font-semibold uppercase tracking-wider text-[10px]">
-                Low confidence
+                {t.insight.lowConfidence}
               </span>
             )}
 
-            <span>{formatTimestamp(englishInsight.generated_at)}</span>
+            <span>{formatTimestamp(insight.generated_at)}</span>
 
-            {englishInsight.metric_refs.length > 0 && (
+            {insight.metric_refs.length > 0 && (
               <span className="text-slate-600">
-                Refs: {englishInsight.metric_refs.join(', ')}
+                {t.insight.refs}: {insight.metric_refs.join(', ')}
               </span>
             )}
           </div>
 
           <div className="flex items-center gap-2 text-xs text-slate-600">
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-slate-600" />
-            Powered by {englishInsight.model_version}
+            {t.insight.poweredBy} {insight.model_version}
           </div>
         </div>
       )}

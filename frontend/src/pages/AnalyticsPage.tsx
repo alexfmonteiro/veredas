@@ -11,6 +11,8 @@ import {
 import { SERIES, type TimeRange, type SeriesConfig } from '@/lib/api';
 import { useMetrics } from '@/hooks/useMetrics';
 import { RangeSelector } from '@/components/RangeSelector';
+import { useLanguage } from '@/lib/LanguageContext';
+import type { Translations } from '@/lib/i18n';
 
 function formatAxisDate(dateStr: string): string {
   const d = new Date(dateStr);
@@ -40,9 +42,10 @@ function downloadCSV(config: SeriesConfig, data: { date: string; value: number }
 interface ChartCardProps {
   config: SeriesConfig;
   range: TimeRange;
+  t: Translations;
 }
 
-function ChartCard({ config, range }: ChartCardProps) {
+function ChartCard({ config, range, t }: ChartCardProps) {
   const { data, isLoading, isError } = useMetrics(config.id, range);
 
   const points = data?.data_points ?? [];
@@ -69,7 +72,7 @@ function ChartCard({ config, range }: ChartCardProps) {
           disabled={chartData.length === 0}
           className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors border border-slate-700/50 rounded-md px-2 py-1 disabled:opacity-30 disabled:cursor-not-allowed"
         >
-          Export CSV
+          {t.analytics.exportCsv}
         </button>
       </div>
 
@@ -81,13 +84,13 @@ function ChartCard({ config, range }: ChartCardProps) {
 
       {isError && (
         <div className="h-48 flex items-center justify-center text-sm text-slate-500">
-          Failed to load data
+          {t.analytics.failedToLoad}
         </div>
       )}
 
       {!isLoading && !isError && chartData.length === 0 && (
         <div className="h-48 flex items-center justify-center text-sm text-slate-500">
-          No data available
+          {t.analytics.noData}
         </div>
       )}
 
@@ -138,9 +141,9 @@ function ChartCard({ config, range }: ChartCardProps) {
 
       {data?.last_updated && (
         <p className="text-[10px] text-slate-600 mt-2">
-          Last updated: {new Date(data.last_updated).toLocaleDateString('en-US')}
+          {t.analytics.lastUpdated}: {new Date(data.last_updated).toLocaleDateString('en-US')}
           {' | '}
-          {points.length} data points
+          {points.length} {t.analytics.dataPoints}
         </p>
       )}
     </div>
@@ -149,15 +152,16 @@ function ChartCard({ config, range }: ChartCardProps) {
 
 export function AnalyticsPage() {
   const [range, setRange] = useState<TimeRange>('2Y');
+  const { t } = useLanguage();
 
   return (
     <div className="min-h-[calc(100vh-3.5rem)] p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       <header className="mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-100">Analytics Dashboard</h1>
+            <h1 className="text-2xl font-bold text-slate-100">{t.analytics.title}</h1>
             <p className="text-sm text-slate-500 mt-1">
-              Detailed time series charts for all tracked indicators
+              {t.analytics.subtitle}
             </p>
           </div>
           <RangeSelector value={range} onChange={setRange} />
@@ -166,7 +170,7 @@ export function AnalyticsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {SERIES.map((s) => (
-          <ChartCard key={s.id} config={s} range={range} />
+          <ChartCard key={s.id} config={s} range={range} t={t} />
         ))}
       </div>
     </div>

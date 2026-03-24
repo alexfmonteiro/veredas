@@ -1,10 +1,14 @@
+import { useLanguage } from '@/lib/LanguageContext';
+
 export function AboutPage() {
+  const { t } = useLanguage();
+
   return (
     <div className="min-h-[calc(100vh-3.5rem)] p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
       <header className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-100">About BR Economic Pulse</h1>
+        <h1 className="text-2xl font-bold text-slate-100">{t.about.title}</h1>
         <p className="text-sm text-slate-500 mt-1">
-          An AI-augmented macroeconomic monitoring platform for Brazil
+          {t.about.subtitle}
         </p>
       </header>
 
@@ -12,7 +16,7 @@ export function AboutPage() {
         {/* Architecture Diagram */}
         <section className="rounded-xl border border-slate-700/50 bg-slate-800/50 p-6">
           <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">
-            Architecture
+            {t.about.architecture}
           </h2>
           <div className="overflow-x-auto">
             <pre className="text-xs text-slate-400 font-mono leading-relaxed">
@@ -38,12 +42,12 @@ export function AboutPage() {
         {/* Tech Stack */}
         <section className="rounded-xl border border-slate-700/50 bg-slate-800/50 p-6">
           <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">
-            Tech Stack
+            {t.about.techStack}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>
               <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                Backend
+                {t.about.backend}
               </h3>
               <ul className="space-y-1.5 text-sm text-slate-300">
                 <li className="flex items-center gap-2">
@@ -70,7 +74,7 @@ export function AboutPage() {
             </div>
             <div>
               <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                Frontend
+                {t.about.frontend}
               </h3>
               <ul className="space-y-1.5 text-sm text-slate-300">
                 <li className="flex items-center gap-2">
@@ -97,7 +101,7 @@ export function AboutPage() {
             </div>
             <div>
               <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                AI / ML
+                {t.about.aiMl}
               </h3>
               <ul className="space-y-1.5 text-sm text-slate-300">
                 <li className="flex items-center gap-2">
@@ -120,7 +124,7 @@ export function AboutPage() {
             </div>
             <div>
               <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                Infrastructure
+                {t.about.infrastructure}
               </h3>
               <ul className="space-y-1.5 text-sm text-slate-300">
                 <li className="flex items-center gap-2">
@@ -147,7 +151,7 @@ export function AboutPage() {
         {/* Data Sources */}
         <section className="rounded-xl border border-slate-700/50 bg-slate-800/50 p-6">
           <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">
-            Data Sources
+            {t.about.dataSources}
           </h2>
           <div className="space-y-4">
             <div className="flex items-start gap-4 rounded-lg border border-slate-700/30 bg-slate-900/30 p-4">
@@ -208,7 +212,7 @@ export function AboutPage() {
         {/* Author */}
         <section className="rounded-xl border border-slate-700/50 bg-slate-800/50 p-6">
           <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">
-            Author
+            {t.about.author}
           </h2>
           <div>
             <p className="text-sm text-slate-300">

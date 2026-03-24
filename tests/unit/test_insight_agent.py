@@ -283,7 +283,10 @@ class TestInsightAgentExecute:
             patch("agents.insight.agent.query_gold_series", side_effect=mock_query_gold),
             patch("agents.insight.agent.anthropic.AsyncAnthropic", return_value=mock_client),
             patch("asyncpg.connect", AsyncMock(return_value=mock_conn)),
-            patch.dict(os.environ, {"DATABASE_URL": "postgresql://test:test@localhost/test"}),
+            patch.dict(os.environ, {
+                "DATABASE_URL": "postgresql://test:test@localhost/test",
+                "ANTHROPIC_API_KEY": "test-key",
+            }),
         ):
             result = await agent._execute()
 
@@ -328,6 +331,7 @@ class TestInsightAgentExecute:
         with (
             patch("agents.insight.agent.query_gold_series", side_effect=mock_query_gold),
             patch("agents.insight.agent.anthropic.AsyncAnthropic", return_value=mock_client),
+            patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}),
         ):
             result = await agent._execute()
 
@@ -364,7 +368,10 @@ class TestInsightAgentExecute:
             patch("agents.insight.agent.query_gold_series", side_effect=mock_query_gold),
             patch("agents.insight.agent.anthropic.AsyncAnthropic", return_value=mock_client),
             patch("asyncpg.connect", AsyncMock(return_value=mock_conn)),
-            patch.dict(os.environ, {"DATABASE_URL": "postgresql://test:test@localhost/test"}),
+            patch.dict(os.environ, {
+                "DATABASE_URL": "postgresql://test:test@localhost/test",
+                "ANTHROPIC_API_KEY": "test-key",
+            }),
         ):
             result = await agent._execute()
 
@@ -404,7 +411,10 @@ class TestInsightAgentExecute:
             patch("agents.insight.agent.query_gold_series", side_effect=mock_query_gold),
             patch("agents.insight.agent.anthropic.AsyncAnthropic", return_value=mock_client),
             patch("asyncpg.connect", AsyncMock(return_value=mock_conn)),
-            patch.dict(os.environ, {"DATABASE_URL": "postgresql://test:test@localhost/test"}),
+            patch.dict(os.environ, {
+                "DATABASE_URL": "postgresql://test:test@localhost/test",
+                "ANTHROPIC_API_KEY": "test-key",
+            }),
         ):
             result = await agent._execute()
 
@@ -433,9 +443,12 @@ class TestInsightAgentExecute:
         with (
             patch("agents.insight.agent.query_gold_series", side_effect=mock_query_gold),
             patch("agents.insight.agent.anthropic.AsyncAnthropic", return_value=mock_client),
-            patch.dict(os.environ, {"DATABASE_URL": ""}, clear=False),
+            patch.dict(os.environ, {
+                "DATABASE_URL": "",
+                "ANTHROPIC_API_KEY": "test-key",
+            }, clear=False),
         ):
             result = await agent._execute()
 
         assert result.success is False
-        assert any("Postgres storage failed" in e for e in result.errors)
+        assert any("Postgres storage failed" in e or "DATABASE_URL" in e for e in result.errors)

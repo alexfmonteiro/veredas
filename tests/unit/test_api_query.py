@@ -205,7 +205,7 @@ class TestPostQuery:
         """Rate-limited request should return 429."""
         with patch(
             "api.main.check_rate_limit",
-            AsyncMock(return_value=False),
+            AsyncMock(return_value=(False, 11)),
         ):
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as client:

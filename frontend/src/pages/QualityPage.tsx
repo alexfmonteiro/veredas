@@ -2,6 +2,7 @@ import { SERIES } from '@/lib/api';
 import { useHealth, useMetrics, useSyncStatus, useQualityLatest } from '@/hooks/useMetrics';
 import { FreshnessBadge } from '@/components/FreshnessBadge';
 import type { TimeRange } from '@/lib/api';
+import { useLanguage } from '@/lib/LanguageContext';
 
 function formatTimestamp(iso: string | null): string {
   if (!iso) return 'Never';
@@ -29,6 +30,7 @@ function formatLag(seconds: number | null): string {
 
 function SyncStatusPanel() {
   const { data, isLoading, isError } = useSyncStatus();
+  const { t } = useLanguage();
 
   if (isLoading) {
     return (
@@ -43,9 +45,9 @@ function SyncStatusPanel() {
     return (
       <div className="rounded-xl border border-slate-700/50 bg-slate-800/50 p-6">
         <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">
-          R2 Sync Status
+          {t.quality.syncStatus}
         </h3>
-        <p className="text-sm text-slate-500">Unable to load sync status</p>
+        <p className="text-sm text-slate-500">{t.quality.unableToLoadSync}</p>
       </div>
     );
   }
@@ -61,7 +63,7 @@ function SyncStatusPanel() {
     <div className="rounded-xl border border-slate-700/50 bg-slate-800/50 p-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
-          R2 Sync Status
+          {t.quality.syncStatus}
         </h3>
         <span className={`text-sm font-semibold uppercase ${healthColor}`}>
           {data.sync_health}
@@ -70,26 +72,26 @@ function SyncStatusPanel() {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div>
-          <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Last Sync</p>
+          <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">{t.quality.lastSync}</p>
           <p className="text-sm text-slate-300">{formatTimestamp(data.last_sync_at)}</p>
         </div>
         <div>
-          <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Sync Lag</p>
+          <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">{t.quality.syncLag}</p>
           <p className="text-sm text-slate-300">{formatLag(data.seconds_since_sync)}</p>
         </div>
         <div>
-          <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Files Synced</p>
+          <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">{t.quality.filesSynced}</p>
           <p className="text-sm text-slate-300">{data.files_synced}</p>
         </div>
         <div>
-          <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Duration</p>
+          <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">{t.quality.duration}</p>
           <p className="text-sm text-slate-300">{formatDuration(data.sync_duration_ms)}</p>
         </div>
       </div>
 
       {data.run_id && (
         <p className="text-[10px] text-slate-600 mt-3">
-          Run ID: {data.run_id} | Source: {data.source}
+          {t.quality.runId}: {data.run_id} | {t.quality.source}: {data.source}
         </p>
       )}
     </div>
@@ -98,6 +100,7 @@ function SyncStatusPanel() {
 
 function QualityStatusPanel() {
   const { data, isLoading, isError } = useQualityLatest();
+  const { t } = useLanguage();
 
   if (isLoading) {
     return (
@@ -112,9 +115,9 @@ function QualityStatusPanel() {
     return (
       <div className="rounded-xl border border-slate-700/50 bg-slate-800/50 p-6">
         <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">
-          Pipeline Quality
+          {t.quality.pipelineQuality}
         </h3>
-        <p className="text-sm text-slate-500">Unable to load quality status</p>
+        <p className="text-sm text-slate-500">{t.quality.unableToLoadQuality}</p>
       </div>
     );
   }
@@ -130,7 +133,7 @@ function QualityStatusPanel() {
     <div className="rounded-xl border border-slate-700/50 bg-slate-800/50 p-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
-          Pipeline Quality
+          {t.quality.pipelineQuality}
         </h3>
         <span
           className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider border ${statusColor}`}
@@ -141,11 +144,11 @@ function QualityStatusPanel() {
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Sync Health</p>
+          <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">{t.quality.syncHealth}</p>
           <p className="text-sm text-slate-300 capitalize">{data.sync_health}</p>
         </div>
         <div>
-          <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Last Sync</p>
+          <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">{t.quality.lastSync}</p>
           <p className="text-sm text-slate-300">
             {data.last_sync ? formatTimestamp(data.last_sync.last_sync_at) : 'N/A'}
           </p>
@@ -154,8 +157,8 @@ function QualityStatusPanel() {
 
       {data.last_sync && (
         <p className="text-[10px] text-slate-600 mt-3">
-          Files synced: {data.last_sync.files_synced}
-          {data.last_sync.run_id && ` | Run: ${data.last_sync.run_id}`}
+          {t.quality.filesSynced}: {data.last_sync.files_synced}
+          {data.last_sync.run_id && ` | ${t.quality.runId}: ${data.last_sync.run_id}`}
         </p>
       )}
     </div>
@@ -166,6 +169,7 @@ const FRESHNESS_RANGE: TimeRange = 'ALL';
 
 function SeriesFreshnessRow({ seriesId, label }: { seriesId: string; label: string }) {
   const { data, isLoading } = useMetrics(seriesId, FRESHNESS_RANGE);
+  const { t } = useLanguage();
 
   return (
     <div className="flex items-center justify-between py-2.5 border-b border-slate-700/30 last:border-0">
@@ -179,7 +183,7 @@ function SeriesFreshnessRow({ seriesId, label }: { seriesId: string; label: stri
         ) : (
           <>
             <span className="text-[10px] text-slate-500">
-              {data?.data_points.length ?? 0} pts
+              {data?.data_points.length ?? 0} {t.analytics.points}
             </span>
             <FreshnessBadge lastUpdated={data?.last_updated ?? null} />
           </>
@@ -191,13 +195,14 @@ function SeriesFreshnessRow({ seriesId, label }: { seriesId: string; label: stri
 
 export function QualityPage() {
   const { data: health } = useHealth();
+  const { t } = useLanguage();
 
   return (
     <div className="min-h-[calc(100vh-3.5rem)] p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       <header className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-100">Data Quality</h1>
+        <h1 className="text-2xl font-bold text-slate-100">{t.quality.title}</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Pipeline transparency, data freshness, and sync status
+          {t.quality.subtitle}
         </p>
       </header>
 
@@ -205,12 +210,12 @@ export function QualityPage() {
         {/* Health overview */}
         <div className="rounded-xl border border-slate-700/50 bg-slate-800/50 p-6">
           <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">
-            System Health
+            {t.quality.systemHealth}
           </h3>
           {health ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               <div>
-                <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Status</p>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">{t.quality.status}</p>
                 <p className={`text-sm font-semibold ${
                   health.status === 'ok' ? 'text-emerald-400' : 'text-yellow-400'
                 }`}>
@@ -218,13 +223,13 @@ export function QualityPage() {
                 </p>
               </div>
               <div>
-                <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Timestamp</p>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">{t.quality.timestamp}</p>
                 <p className="text-sm text-slate-300">
                   {formatTimestamp(health.timestamp)}
                 </p>
               </div>
               <div>
-                <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Sync Health</p>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">{t.quality.syncHealth}</p>
                 <p className="text-sm text-slate-300 capitalize">
                   {health.sync?.sync_health ?? 'Unknown'}
                 </p>
@@ -246,7 +251,7 @@ export function QualityPage() {
         {/* Per-series freshness */}
         <div className="rounded-xl border border-slate-700/50 bg-slate-800/50 p-6">
           <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">
-            Series Freshness
+            {t.quality.seriesFreshness}
           </h3>
           <div>
             {SERIES.map((s) => (
@@ -259,7 +264,7 @@ export function QualityPage() {
         {health?.data_freshness && Object.keys(health.data_freshness).length > 0 && (
           <div className="rounded-xl border border-slate-700/50 bg-slate-800/50 p-6">
             <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">
-              Data Freshness (from Health Check)
+              {t.quality.dataFreshnessHealth}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {Object.entries(health.data_freshness).map(([key, value]) => (

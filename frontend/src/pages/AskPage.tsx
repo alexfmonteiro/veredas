@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
+import Markdown from 'react-markdown';
 import { postQuery } from '@/lib/api';
 import type { QueryResponse } from '@/lib/api';
+import { useLanguage } from '@/lib/LanguageContext';
+import type { Translations } from '@/lib/i18n';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -10,7 +13,7 @@ interface Message {
   error?: string;
 }
 
-function TierBadge({ tier }: { tier: 'direct_lookup' | 'full_llm' }) {
+function TierBadge({ tier, t }: { tier: 'direct_lookup' | 'full_llm'; t: Translations }) {
   const isT1 = tier === 'direct_lookup';
   return (
     <span
@@ -20,18 +23,18 @@ function TierBadge({ tier }: { tier: 'direct_lookup' | 'full_llm' }) {
           : 'bg-brand-500/20 text-brand-400 border-brand-500/30'
       }`}
     >
-      {isT1 ? 'Tier 1 - Direct Lookup' : 'Tier 3 - LLM'}
+      {isT1 ? t.ask.tier1 : t.ask.tier3}
     </span>
   );
 }
 
-function DataCitations({ response }: { response: QueryResponse }) {
+function DataCitations({ response, t }: { response: QueryResponse; t: Translations }) {
   if (response.data_points.length === 0) return null;
 
   return (
     <div className="mt-3 rounded-lg border border-slate-700/50 bg-slate-900/50 p-3">
       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
-        Data Points
+        {t.ask.dataPoints}
       </p>
       <div className="space-y-1">
         {response.data_points.map((dp, i) => (
@@ -46,7 +49,7 @@ function DataCitations({ response }: { response: QueryResponse }) {
       </div>
       {response.sources.length > 0 && (
         <p className="text-[10px] text-slate-600 mt-2">
-          Sources: {response.sources.join(', ')}
+          {t.ask.sources}: {response.sources.join(', ')}
         </p>
       )}
     </div>
@@ -54,6 +57,7 @@ function DataCitations({ response }: { response: QueryResponse }) {
 }
 
 export function AskPage() {
+  const { t } = useLanguage();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -113,20 +117,23 @@ export function AskPage() {
     }
   };
 
+  const dailyUsedText = t.ask.dailyUsed
+    .replace('{count}', String(questionCount))
+    .replace('{limit}', '10');
+
   return (
     <div className="min-h-[calc(100vh-3.5rem)] flex flex-col max-w-3xl mx-auto px-4 sm:px-6">
       {/* Header */}
       <header className="py-6">
-        <h1 className="text-2xl font-bold text-slate-100">Ask AI</h1>
+        <h1 className="text-2xl font-bold text-slate-100">{t.ask.title}</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Ask questions about Brazilian economic indicators. Powered by
-          Claude Sonnet with tiered query routing.
+          {t.ask.subtitle}
         </p>
       </header>
 
       {/* Rate limit indicator */}
       <div className="mb-4 text-xs text-slate-500">
-        {questionCount} of 20 daily questions used
+        {dailyUsedText}
       </div>
 
       {/* Messages */}
@@ -134,14 +141,10 @@ export function AskPage() {
         {messages.length === 0 && (
           <div className="text-center py-16">
             <p className="text-slate-500 text-sm mb-4">
-              No questions yet. Try asking something like:
+              {t.ask.noQuestions}
             </p>
             <div className="space-y-2">
-              {[
-                'What is the current SELIC rate?',
-                'How has the USD/BRL exchange rate changed this year?',
-                'What is the latest unemployment rate in Brazil?',
-              ].map((suggestion) => (
+              {t.ask.suggestions.map((suggestion) => (
                 <button
                   key={suggestion}
                   onClick={() => setInput(suggestion)}
@@ -169,28 +172,28 @@ export function AskPage() {
               {msg.isLoading && (
                 <div className="flex items-center gap-2 text-sm text-slate-400">
                   <div className="h-2 w-2 rounded-full bg-brand-500 animate-pulse" />
-                  Thinking...
+                  {t.ask.thinking}
                 </div>
               )}
 
               {msg.error && (
-                <p className="text-sm text-red-400">Error: {msg.error}</p>
+                <p className="text-sm text-red-400">{t.ask.error}: {msg.error}</p>
               )}
 
               {!msg.isLoading && !msg.error && msg.role === 'assistant' && (
                 <>
-                  <p className="text-sm leading-relaxed whitespace-pre-line">
-                    {msg.content}
-                  </p>
+                  <div className="text-sm leading-relaxed prose prose-invert prose-sm max-w-none prose-p:my-1 prose-strong:text-slate-100 prose-ul:my-1 prose-li:my-0">
+                    <Markdown>{msg.content}</Markdown>
+                  </div>
 
                   {msg.response && (
                     <>
-                      <DataCitations response={msg.response} />
+                      <DataCitations response={msg.response} t={t} />
                       <div className="flex items-center gap-3 mt-3">
-                        <TierBadge tier={msg.response.tier_used} />
+                        <TierBadge tier={msg.response.tier_used} t={t} />
                         {msg.response.llm_tokens_used > 0 && (
                           <span className="text-[10px] text-slate-500">
-                            {msg.response.llm_tokens_used.toLocaleString()} tokens
+                            {msg.response.llm_tokens_used.toLocaleString()} {t.ask.tokens}
                           </span>
                         )}
                       </div>
@@ -216,7 +219,7 @@ export function AskPage() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask about Brazilian economic indicators..."
+            placeholder={t.ask.placeholder}
             disabled={isSubmitting}
             className="flex-1 rounded-lg border border-slate-700/50 bg-slate-800/50 px-4 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/50 disabled:opacity-50"
           />
@@ -225,12 +228,12 @@ export function AskPage() {
             disabled={isSubmitting || !input.trim()}
             className="rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Send
+            {t.ask.send}
           </button>
         </form>
 
         <p className="text-[10px] text-slate-600 mt-2 text-center">
-          AI-generated responses may be inaccurate. Verify data with official sources (BCB, IBGE, Tesouro Nacional).
+          {t.ask.disclaimer}
         </p>
       </div>
     </div>

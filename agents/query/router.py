@@ -17,13 +17,18 @@ logger = structlog.get_logger()
 
 DIRECT_LOOKUP_PATTERNS: dict[re.Pattern[str], str] = {
     re.compile(
-        r"(what|qual|quanto).*(current|atual|hoje|today|now).*(selic|ipca|"
-        r"dolar|dollar|usd|brl|cambio|câmbio|desemprego|unemployment|pib|gdp)",
+        r"(what|qual|quanto).*(current|atual|hoje|today|now|latest|último|ultima)"
+        r".*(selic|ipca|dolar|dollar|usd|brl|cambio|câmbio|desemprego|unemployment|pib|gdp|tesouro)",
+        re.IGNORECASE,
+    ): "latest_value",
+    re.compile(
+        r"(what|qual).*(latest|último|ultima|last|recent)"
+        r".*(selic|ipca|dolar|dollar|usd|brl|cambio|câmbio|desemprego|unemployment|pib|gdp|rate|taxa|tesouro)",
         re.IGNORECASE,
     ): "latest_value",
     re.compile(
         r"(last|ultimo|última).*(value|valor|dado).*(selic|ipca|dolar|"
-        r"dollar|usd|brl|cambio|câmbio)",
+        r"dollar|usd|brl|cambio|câmbio|desemprego|unemployment|pib|gdp|tesouro)",
         re.IGNORECASE,
     ): "latest_value",
 }
@@ -44,6 +49,7 @@ METRIC_KEYWORDS: dict[str, str] = {
     "unemployment": "ibge_pnad",
     "pib": "ibge_gdp",
     "gdp": "ibge_gdp",
+    "tesouro": "tesouro",
 }
 
 

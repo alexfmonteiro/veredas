@@ -181,9 +181,10 @@ class QueryAgent(BaseAgent):
         messages.append({"role": "user", "content": user_message})
 
         # Stream Claude response
-        client = anthropic.AsyncAnthropic(
-            api_key=os.environ.get("ANTHROPIC_API_KEY", ""),
-        )
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if not api_key:
+            raise ValueError("ANTHROPIC_API_KEY is not set")
+        client = anthropic.AsyncAnthropic(api_key=api_key)
 
         answer_parts: list[str] = []
         total_input_tokens = 0

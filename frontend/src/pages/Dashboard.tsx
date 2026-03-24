@@ -4,9 +4,11 @@ import { MetricCard } from '@/components/MetricCard';
 import { InsightDigest } from '@/components/InsightDigest';
 import { RangeSelector } from '@/components/RangeSelector';
 import { useHealth } from '@/hooks/useMetrics';
+import { useLanguage } from '@/lib/LanguageContext';
 
 export function Dashboard() {
   const { data: health } = useHealth();
+  const { t } = useLanguage();
   const syncHealth = health?.sync?.sync_health ?? 'unknown';
   const [range, setRange] = useState<TimeRange>('1Y');
 
@@ -18,7 +20,7 @@ export function Dashboard() {
           <div>
             <div className="flex items-center gap-3 mb-1">
               <h1 className="text-2xl font-bold text-slate-100 tracking-tight">
-                BR Economic Pulse
+                {t.hero.title}
               </h1>
               {syncHealth !== 'unknown' && (
                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider border ${
@@ -33,7 +35,7 @@ export function Dashboard() {
               )}
             </div>
             <p className="text-sm text-slate-500">
-              Real-time Brazilian macroeconomic indicators
+              {t.hero.subtitle}
             </p>
           </div>
 
@@ -54,9 +56,9 @@ export function Dashboard() {
       {/* Footer */}
       <footer className="mt-12 py-6 border-t border-slate-800 text-center text-xs text-slate-600">
         <p>
-          Data sourced from BCB, IBGE, and Tesouro Nacional.{' '}
+          {t.hero.dataSourceFooter}{' '}
           <a href="/quality" className="text-brand-500 hover:text-brand-400">
-            View data quality
+            {t.hero.dataQualityLink}
           </a>
         </p>
       </footer>

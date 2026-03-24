@@ -225,8 +225,20 @@ class InsightAgent(BaseAgent):
 
         # --- Step 4: Call Claude API ---
         generated_at = datetime.now(timezone.utc)
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if not api_key:
+            errors.append("ANTHROPIC_API_KEY is not set — skipping insight generation")
+            logger.warning("insight_skipped_no_api_key")
+            return AgentResult(
+                success=False,
+                agent_name=self.agent_name,
+                duration_ms=0.0,
+                rows_processed=total_rows,
+                errors=errors,
+                warnings=warnings,
+            )
         try:
-            client = anthropic.AsyncAnthropic()
+            client = anthropic.AsyncAnthropic(api_key=api_key)
             response = await client.messages.create(
                 model=_MODEL_VERSION,
                 max_tokens=2048,

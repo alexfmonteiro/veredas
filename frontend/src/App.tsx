@@ -4,8 +4,27 @@ import { AskPage } from '@/pages/AskPage';
 import { AnalyticsPage } from '@/pages/AnalyticsPage';
 import { QualityPage } from '@/pages/QualityPage';
 import { AboutPage } from '@/pages/AboutPage';
+import { useLanguage } from '@/lib/LanguageContext';
+
+function LanguageToggle() {
+  const { language, setLanguage } = useLanguage();
+
+  return (
+    <button
+      onClick={() => setLanguage(language === 'en' ? 'pt' : 'en')}
+      className="ml-auto flex items-center gap-1 rounded-md border border-slate-700/50 px-2 py-1 text-xs font-medium text-slate-400 hover:text-slate-200 hover:border-slate-600 transition-colors"
+      aria-label="Toggle language"
+    >
+      <span className={language === 'pt' ? 'text-slate-200 font-semibold' : ''}>PT</span>
+      <span className="text-slate-600">/</span>
+      <span className={language === 'en' ? 'text-slate-200 font-semibold' : ''}>EN</span>
+    </button>
+  );
+}
 
 function NavBar() {
+  const { t } = useLanguage();
+
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     `px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
       isActive
@@ -19,11 +38,12 @@ function NavBar() {
         <NavLink to="/" className="text-lg font-bold text-slate-100 mr-6">
           BR Economic Pulse
         </NavLink>
-        <NavLink to="/" end className={linkClass}>Home</NavLink>
-        <NavLink to="/dashboard" className={linkClass}>Dashboard</NavLink>
-        <NavLink to="/ask" className={linkClass}>Ask AI</NavLink>
-        <NavLink to="/quality" className={linkClass}>Quality</NavLink>
-        <NavLink to="/about" className={linkClass}>About</NavLink>
+        <NavLink to="/" end className={linkClass}>{t.nav.home}</NavLink>
+        <NavLink to="/dashboard" className={linkClass}>{t.nav.dashboard}</NavLink>
+        <NavLink to="/ask" className={linkClass}>{t.nav.askAi}</NavLink>
+        <NavLink to="/quality" className={linkClass}>{t.nav.quality}</NavLink>
+        <NavLink to="/about" className={linkClass}>{t.nav.about}</NavLink>
+        <LanguageToggle />
       </div>
     </nav>
   );

@@ -38,14 +38,15 @@ from api.models import (
     SyncResult,
     SyncStatusResponse,
 )
-from api.rate_limiter import check_rate_limit
+from api.rate_limiter import check_rate_limit, get_remaining_queries
 
 logger = structlog.get_logger()
 
-# In-memory conversation history per IP (max 10 turns per IP).
+# In-memory conversation history per session (max 10 turns).
 _conversation_history: dict[str, list[dict[str, str]]] = {}
 
 _MAX_HISTORY_TURNS = 10
+_SESSION_COOKIE_NAME = "br_ep_session"
 
 
 @asynccontextmanager
@@ -71,7 +72,7 @@ app.add_middleware(
     allow_origins=_get_allowed_origins(),
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
-    allow_credentials=False,
+    allow_credentials=True,
 )
 
 
@@ -98,19 +99,26 @@ def _get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def _get_history(ip: str) -> list[dict[str, str]]:
-    """Return conversation history for an IP, capped at max turns."""
-    return _conversation_history.get(ip, [])
+def _get_session_id(request: Request) -> str:
+    """Get session ID from cookie, or return a fallback based on IP."""
+    session = request.cookies.get(_SESSION_COOKIE_NAME)
+    if session:
+        return session[:16]  # Use prefix as dict key
+    return _get_client_ip(request)
 
 
-def _append_history(ip: str, role: str, content: str) -> None:
+def _get_history(session_id: str) -> list[dict[str, str]]:
+    """Return conversation history for a session, capped at max turns."""
+    return _conversation_history.get(session_id, [])
+
+
+def _append_history(session_id: str, role: str, content: str) -> None:
     """Append a turn to conversation history, enforcing max turns."""
-    if ip not in _conversation_history:
-        _conversation_history[ip] = []
-    _conversation_history[ip].append({"role": role, "content": content})
-    # Keep only the last N turns
-    if len(_conversation_history[ip]) > _MAX_HISTORY_TURNS:
-        _conversation_history[ip] = _conversation_history[ip][-_MAX_HISTORY_TURNS:]
+    if session_id not in _conversation_history:
+        _conversation_history[session_id] = []
+    _conversation_history[session_id].append({"role": role, "content": content})
+    if len(_conversation_history[session_id]) > _MAX_HISTORY_TURNS:
+        _conversation_history[session_id] = _conversation_history[session_id][-_MAX_HISTORY_TURNS:]
 
 
 # --- Routes ---
@@ -191,22 +199,24 @@ async def sync_status() -> SyncStatusResponse:
 
 
 @app.post("/api/query")
-async def post_query(body: QueryRequest, request: Request) -> QueryResponse:
+async def post_query(body: QueryRequest, request: Request, response: Response) -> QueryResponse:
     """Answer a user question about Brazilian economic data."""
     correlation_id = uuid4().hex[:12]
     ip = _get_client_ip(request)
     log = logger.bind(correlation_id=correlation_id, ip=ip)
 
-    # Rate limiting
-    if not await check_rate_limit(ip):
-        log.warning("rate_limit_exceeded")
+    # Session-based rate limiting
+    allowed, count = await check_rate_limit(request, response)
+    if not allowed:
+        log.warning("rate_limit_exceeded", count=count)
         raise HTTPException(
             status_code=429,
-            detail="Rate limit exceeded (20 requests/day). Try again tomorrow.",
+            detail="Rate limit exceeded (10 requests/day). Try again tomorrow.",
         )
 
     # Build agent with conversation history
-    history = _get_history(ip)
+    session_id = _get_session_id(request)
+    history = _get_history(session_id)
     agent = QueryAgent(question=body.question, history=history)
 
     # Execute with 30s timeout
@@ -232,39 +242,41 @@ async def post_query(body: QueryRequest, request: Request) -> QueryResponse:
             detail=f"Query failed. correlation_id={correlation_id}",
         )
 
-    response = agent.query_response
+    query_resp = agent.query_response
 
     # Update conversation history
-    _append_history(ip, "user", body.question)
-    _append_history(ip, "assistant", response.answer)
+    _append_history(session_id, "user", body.question)
+    _append_history(session_id, "assistant", query_resp.answer)
 
     log.info(
         "query_completed",
-        tier=response.tier_used.value,
-        tokens=response.llm_tokens_used,
+        tier=query_resp.tier_used.value,
+        tokens=query_resp.llm_tokens_used,
     )
 
-    return response
+    return query_resp
 
 
 @app.post("/api/query/stream")
 async def query_stream(
-    body: QueryRequest, request: Request
+    body: QueryRequest, request: Request, response: Response
 ) -> StreamingResponse:
     """Answer a user question via Server-Sent Events."""
     correlation_id = uuid4().hex[:12]
     ip = _get_client_ip(request)
     log = logger.bind(correlation_id=correlation_id, ip=ip)
 
-    # Rate limiting
-    if not await check_rate_limit(ip):
-        log.warning("rate_limit_exceeded")
+    # Session-based rate limiting
+    allowed, count = await check_rate_limit(request, response)
+    if not allowed:
+        log.warning("rate_limit_exceeded", count=count)
         raise HTTPException(
             status_code=429,
-            detail="Rate limit exceeded (20 requests/day). Try again tomorrow.",
+            detail="Rate limit exceeded (10 requests/day). Try again tomorrow.",
         )
 
-    history = _get_history(ip)
+    session_id = _get_session_id(request)
+    history = _get_history(session_id)
 
     async def _event_generator() -> AsyncGenerator[str, None]:
         agent = QueryAgent(question=body.question, history=history)
@@ -322,8 +334,8 @@ async def query_stream(
         yield f"data: {done_payload}\n\n"
 
         # Update conversation history
-        _append_history(ip, "user", body.question)
-        _append_history(ip, "assistant", qr.answer)
+        _append_history(session_id, "user", body.question)
+        _append_history(session_id, "assistant", qr.answer)
 
         log.info(
             "stream_query_completed",
@@ -335,6 +347,13 @@ async def query_stream(
         _event_generator(),
         media_type="text/event-stream",
     )
+
+
+@app.get("/api/query/remaining")
+async def query_remaining(request: Request) -> dict[str, int]:
+    """Return how many daily queries the session has left."""
+    remaining = await get_remaining_queries(request)
+    return {"remaining": remaining, "limit": 10}
 
 
 @app.get("/api/insights/latest")

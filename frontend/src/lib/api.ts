@@ -81,6 +81,55 @@ export const TIME_RANGES: { value: TimeRange; label: string }[] = [
   { value: 'ALL', label: 'All' },
 ];
 
+// --- Query types ---
+
+export interface QueryRequest {
+  question: string;
+}
+
+export interface DataPointResponse {
+  series: string;
+  value: number;
+  date: string;
+}
+
+export interface QueryResponse {
+  answer: string;
+  data_points: DataPointResponse[];
+  sources: string[];
+  tier_used: 'direct_lookup' | 'full_llm';
+  llm_tokens_used: number;
+}
+
+// --- Insight types ---
+
+export interface InsightRecord {
+  content: string;
+  language: string;
+  metric_refs: string[];
+  model_version: string;
+  run_id: string;
+  generated_at: string;
+  confidence_flag: boolean;
+}
+
+export interface InsightResponse {
+  insights: InsightRecord[];
+  latest_run_id: string | null;
+}
+
+// --- Sync status ---
+
+export interface SyncStatusResponse {
+  last_sync_at: string | null;
+  run_id: string | null;
+  files_synced: number;
+  sync_duration_ms: number;
+  source: string;
+  seconds_since_sync: number | null;
+  sync_health: string;
+}
+
 // --- Fetchers ---
 
 export const fetchMetrics = (series: string, after?: string | null): Promise<MetricsResponse> => {
@@ -93,6 +142,25 @@ export const fetchHealth = (): Promise<HealthResponse> =>
 
 export const fetchQualityLatest = (): Promise<QualityLatest> =>
   fetchJSON('/api/quality/latest');
+
+export const fetchInsightsLatest = (): Promise<InsightResponse> =>
+  fetchJSON('/api/insights/latest');
+
+export const fetchSyncStatus = (): Promise<SyncStatusResponse> =>
+  fetchJSON('/api/quality/sync-status');
+
+export async function postQuery(question: string): Promise<QueryResponse> {
+  const res = await fetch(`${API_BASE}/api/query`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as Record<string, string>).detail ?? `API ${res.status}`);
+  }
+  return res.json() as Promise<QueryResponse>;
+}
 
 // --- Series Config ---
 

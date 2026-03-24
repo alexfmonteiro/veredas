@@ -17,6 +17,9 @@ from api.models import PipelineStage  # noqa: E402
 from pipeline.feed_config import load_feed_configs  # noqa: E402
 from pipeline.flow import PipelineFlow  # noqa: E402
 from storage import get_storage_backend  # noqa: E402
+from agents.base import BaseAgent  # noqa: E402
+from agents.insight.agent import InsightAgent  # noqa: E402
+from tasks.base import BaseTask  # noqa: E402
 from tasks.ingestion.task import IngestionTask  # noqa: E402
 from tasks.quality.task import QualityTask  # noqa: E402
 from tasks.transformation.task import TransformationTask  # noqa: E402
@@ -35,7 +38,7 @@ def parse_args() -> argparse.Namespace:
 
 
 async def main() -> int:
-    """Run the full pipeline: Ingest → Quality → Transform → Quality."""
+    """Run the full pipeline: Ingest → Quality → Transform → Quality → Insight."""
     args = parse_args()
     storage = get_storage_backend()
     feed_configs = load_feed_configs()
@@ -48,7 +51,7 @@ async def main() -> int:
     if args.backfill:
         logger.info("pipeline_backfill_mode", feeds=list(feed_configs.keys()))
 
-    stages = [
+    stages: list[BaseTask | BaseAgent] = [
         IngestionTask(
             storage=storage,
             feed_configs=feed_configs,
@@ -58,6 +61,7 @@ async def main() -> int:
         QualityTask(storage=storage, stage=PipelineStage.POST_INGESTION, feed_configs=feed_configs),
         TransformationTask(storage=storage, feed_configs=feed_configs),
         QualityTask(storage=storage, stage=PipelineStage.POST_TRANSFORMATION, feed_configs=feed_configs),
+        InsightAgent(),
     ]
 
     flow = PipelineFlow()

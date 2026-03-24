@@ -1,0 +1,441 @@
+"""Tests for InsightAgent — agents/insight/agent.py."""
+
+from __future__ import annotations
+
+import os
+from datetime import datetime, timezone
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import anthropic.types as atypes
+import pytest
+
+from agents.insight.agent import (
+    InsightAgent,
+    _compute_z_scores,
+    _detect_anomalies,
+    _format_gold_summary,
+    _parse_insight_sections,
+)
+
+
+# ---------------------------------------------------------------------------
+# _compute_z_scores
+# ---------------------------------------------------------------------------
+
+
+class TestComputeZScores:
+    def test_normal_data(self) -> None:
+        values = [10.0, 20.0, 30.0, 40.0, 50.0]
+        z = _compute_z_scores(values)
+        assert len(z) == 5
+        # Mean=30, std~=14.14 → z[0] ~ -1.41, z[4] ~ +1.41
+        assert z[0] < 0
+        assert z[4] > 0
+        # Middle value should be near zero
+        assert abs(z[2]) < 1e-10
+
+    def test_empty_list(self) -> None:
+        assert _compute_z_scores([]) == []
+
+    def test_single_value(self) -> None:
+        assert _compute_z_scores([42.0]) == []
+
+    def test_all_same_values(self) -> None:
+        values = [5.0, 5.0, 5.0, 5.0]
+        z = _compute_z_scores(values)
+        assert len(z) == 4
+        # std=0 → all z-scores should be 0.0
+        assert all(score == 0.0 for score in z)
+
+    def test_two_values(self) -> None:
+        values = [0.0, 10.0]
+        z = _compute_z_scores(values)
+        assert len(z) == 2
+        # Symmetric around mean=5
+        assert z[0] == pytest.approx(-z[1])
+
+
+# ---------------------------------------------------------------------------
+# _detect_anomalies
+# ---------------------------------------------------------------------------
+
+
+class TestDetectAnomalies:
+    def test_detects_anomaly_with_high_z_score(self) -> None:
+        """A single outlier should be flagged when |z| > 2.0."""
+        # 9 values near 10, one huge outlier
+        rows: list[dict[str, Any]] = [
+            {"date": f"2024-0{i+1}-01", "value": 10.0} for i in range(9)
+        ]
+        rows.append({"date": "2024-10-01", "value": 100.0})
+        series_data = {"bcb_432": rows}
+        anomalies = _detect_anomalies(series_data)
+        assert len(anomalies) >= 1
+        assert "bcb_432" in anomalies[0]
+        assert "100.0" in anomalies[0]
+
+    def test_no_anomalies_in_uniform_data(self) -> None:
+        rows: list[dict[str, Any]] = [
+            {"date": f"2024-0{i+1}-01", "value": 10.0} for i in range(5)
+        ]
+        series_data = {"bcb_432": rows}
+        anomalies = _detect_anomalies(series_data)
+        assert anomalies == []
+
+    def test_skips_series_with_fewer_than_two_values(self) -> None:
+        series_data: dict[str, list[dict[str, Any]]] = {
+            "bcb_1": [{"date": "2024-01-01", "value": 5.0}],
+        }
+        anomalies = _detect_anomalies(series_data)
+        assert anomalies == []
+
+    def test_multiple_series(self) -> None:
+        normal_rows: list[dict[str, Any]] = [
+            {"date": f"2024-0{i+1}-01", "value": 10.0} for i in range(5)
+        ]
+        outlier_rows: list[dict[str, Any]] = [
+            {"date": f"2024-0{i+1}-01", "value": 10.0} for i in range(9)
+        ]
+        outlier_rows.append({"date": "2024-10-01", "value": 200.0})
+        series_data = {
+            "bcb_432": normal_rows,
+            "bcb_433": outlier_rows,
+        }
+        anomalies = _detect_anomalies(series_data)
+        assert any("bcb_433" in a for a in anomalies)
+
+    def test_skips_none_values(self) -> None:
+        rows: list[dict[str, Any]] = [
+            {"date": "2024-01-01", "value": 10.0},
+            {"date": "2024-02-01", "value": None},
+            {"date": "2024-03-01", "value": 10.0},
+        ]
+        series_data = {"bcb_1": rows}
+        # Should not raise — None values are filtered out
+        anomalies = _detect_anomalies(series_data)
+        assert isinstance(anomalies, list)
+
+
+# ---------------------------------------------------------------------------
+# _format_gold_summary
+# ---------------------------------------------------------------------------
+
+
+class TestFormatGoldSummary:
+    def test_basic_formatting(self) -> None:
+        series_data: dict[str, list[dict[str, Any]]] = {
+            "bcb_432": [
+                {"date": "2024-01-01", "value": 11.75},
+                {"date": "2024-03-01", "value": 12.25},
+            ],
+        }
+        result = _format_gold_summary(series_data, anomalies=[])
+        assert "bcb_432" in result
+        assert "2 data points" in result
+        assert "2024-01-01" in result
+        assert "2024-03-01" in result
+        assert "12.25" in result
+
+    def test_empty_series(self) -> None:
+        series_data: dict[str, list[dict[str, Any]]] = {
+            "bcb_1": [],
+        }
+        result = _format_gold_summary(series_data, anomalies=[])
+        assert "bcb_1: no data available" in result
+
+    def test_includes_anomalies(self) -> None:
+        series_data: dict[str, list[dict[str, Any]]] = {
+            "bcb_432": [{"date": "2024-01-01", "value": 11.0}],
+        }
+        anomalies = ["bcb_432 on 2024-01-01: value=11.0, z-score=2.50"]
+        result = _format_gold_summary(series_data, anomalies)
+        assert "Anomalies detected" in result
+        assert "z-score=2.50" in result
+
+    def test_no_anomalies_omits_section(self) -> None:
+        series_data: dict[str, list[dict[str, Any]]] = {
+            "bcb_432": [{"date": "2024-01-01", "value": 11.0}],
+        }
+        result = _format_gold_summary(series_data, anomalies=[])
+        assert "Anomalies" not in result
+
+
+# ---------------------------------------------------------------------------
+# _parse_insight_sections
+# ---------------------------------------------------------------------------
+
+
+class TestParseInsightSections:
+    def test_pt_and_en_sections(self) -> None:
+        raw = "<pt>Resumo em portugues</pt>\n<en>Summary in English</en>"
+        now = datetime.now(timezone.utc)
+        records = _parse_insight_sections(
+            raw, run_id="abc123", generated_at=now,
+            metric_refs=["bcb_432"], confidence_flag=True,
+        )
+        assert len(records) == 2
+        assert records[0].language == "pt"
+        assert records[0].content == "Resumo em portugues"
+        assert records[1].language == "en"
+        assert records[1].content == "Summary in English"
+        assert records[0].run_id == "abc123"
+        assert records[0].metric_refs == ["bcb_432"]
+
+    def test_fallback_to_en_only(self) -> None:
+        raw = "Just some plain text without tags."
+        now = datetime.now(timezone.utc)
+        records = _parse_insight_sections(
+            raw, run_id="xyz", generated_at=now,
+            metric_refs=[], confidence_flag=False,
+        )
+        assert len(records) == 1
+        assert records[0].language == "en"
+        assert records[0].content == "Just some plain text without tags."
+        assert records[0].confidence_flag is False
+
+    def test_only_pt_tag(self) -> None:
+        raw = "<pt>Apenas portugues</pt>"
+        now = datetime.now(timezone.utc)
+        records = _parse_insight_sections(
+            raw, run_id="r1", generated_at=now,
+            metric_refs=[], confidence_flag=True,
+        )
+        assert len(records) == 1
+        assert records[0].language == "pt"
+
+    def test_empty_tags_fallback(self) -> None:
+        raw = "<pt></pt>\n<en></en>"
+        now = datetime.now(timezone.utc)
+        records = _parse_insight_sections(
+            raw, run_id="r2", generated_at=now,
+            metric_refs=[], confidence_flag=True,
+        )
+        # Empty tags → empty content → skipped → fallback to entire text as EN
+        assert len(records) == 1
+        assert records[0].language == "en"
+
+    def test_model_version_set(self) -> None:
+        raw = "<pt>Texto</pt><en>Text</en>"
+        now = datetime.now(timezone.utc)
+        records = _parse_insight_sections(
+            raw, run_id="r3", generated_at=now,
+            metric_refs=[], confidence_flag=True,
+        )
+        for rec in records:
+            assert rec.model_version == "claude-sonnet-4-20250514"
+
+
+# ---------------------------------------------------------------------------
+# InsightAgent._execute — integration-style tests with all deps mocked
+# ---------------------------------------------------------------------------
+
+
+def _make_gold_rows(
+    series: str, count: int = 3, base_value: float = 11.0,
+) -> list[dict[str, Any]]:
+    """Helper to create gold data rows."""
+    return [
+        {
+            "date": datetime(2024, i + 1, 1),
+            "value": base_value + i * 0.25,
+            "series": series,
+        }
+        for i in range(count)
+    ]
+
+
+class TestInsightAgentExecute:
+    @pytest.mark.asyncio
+    async def test_successful_run_with_pt_en(self) -> None:
+        """Full happy-path: gold data available, Claude returns PT+EN, Postgres stores."""
+        gold_data: dict[str, list[dict[str, Any]]] = {
+            "bcb_432": _make_gold_rows("bcb_432"),
+            "bcb_433": _make_gold_rows("bcb_433"),
+            "bcb_1": _make_gold_rows("bcb_1"),
+            "ibge_pnad": _make_gold_rows("ibge_pnad"),
+            "ibge_gdp": _make_gold_rows("ibge_gdp"),
+            "tesouro": _make_gold_rows("tesouro"),
+        }
+
+        async def mock_query_gold(series: str, after: str | None = None) -> list[dict[str, Any]]:
+            return gold_data.get(series, [])
+
+        # Mock Claude response
+        mock_text_block = atypes.TextBlock(
+            type="text",
+            text="<pt>Resumo em PT</pt>\n<en>Summary in EN</en>",
+        )
+        mock_response = MagicMock()
+        mock_response.content = [mock_text_block]
+
+        mock_client = MagicMock()
+        mock_client.messages.create = AsyncMock(return_value=mock_response)
+
+        # Mock asyncpg
+        mock_conn = AsyncMock()
+        mock_conn.execute = AsyncMock()
+        mock_conn.close = AsyncMock()
+
+        agent = InsightAgent()
+
+        with (
+            patch("agents.insight.agent.query_gold_series", side_effect=mock_query_gold),
+            patch("agents.insight.agent.anthropic.AsyncAnthropic", return_value=mock_client),
+            patch("asyncpg.connect", AsyncMock(return_value=mock_conn)),
+            patch.dict(os.environ, {"DATABASE_URL": "postgresql://test:test@localhost/test"}),
+        ):
+            result = await agent._execute()
+
+        assert result.success is True
+        assert result.agent_name == "insight"
+        assert result.rows_processed > 0
+        assert result.errors == []
+        # Verify Claude was called
+        mock_client.messages.create.assert_awaited_once()
+        # Verify Postgres storage (CREATE TABLE + 2 INSERTs for PT and EN)
+        assert mock_conn.execute.await_count >= 3
+
+    @pytest.mark.asyncio
+    async def test_no_gold_data_returns_failure(self) -> None:
+        """When no gold data is available, agent should return success=False."""
+        async def mock_query_empty(series: str, after: str | None = None) -> list[dict[str, Any]]:
+            return []
+
+        agent = InsightAgent()
+
+        with patch("agents.insight.agent.query_gold_series", side_effect=mock_query_empty):
+            result = await agent._execute()
+
+        assert result.success is False
+        assert any("No gold data" in e for e in result.errors)
+
+    @pytest.mark.asyncio
+    async def test_claude_api_error_returns_failure(self) -> None:
+        """When Claude API raises an exception, agent should return success=False."""
+        gold_data = {"bcb_432": _make_gold_rows("bcb_432")}
+
+        async def mock_query_gold(series: str, after: str | None = None) -> list[dict[str, Any]]:
+            return gold_data.get(series, [])
+
+        mock_client = MagicMock()
+        mock_client.messages.create = AsyncMock(
+            side_effect=RuntimeError("API rate limit exceeded")
+        )
+
+        agent = InsightAgent()
+
+        with (
+            patch("agents.insight.agent.query_gold_series", side_effect=mock_query_gold),
+            patch("agents.insight.agent.anthropic.AsyncAnthropic", return_value=mock_client),
+        ):
+            result = await agent._execute()
+
+        assert result.success is False
+        assert any("Claude API call failed" in e for e in result.errors)
+
+    @pytest.mark.asyncio
+    async def test_postgres_storage_error_returns_failure(self) -> None:
+        """When Postgres storage fails, agent should return success=False."""
+        gold_data = {"bcb_432": _make_gold_rows("bcb_432")}
+
+        async def mock_query_gold(series: str, after: str | None = None) -> list[dict[str, Any]]:
+            return gold_data.get(series, [])
+
+        # Mock Claude response (success)
+        mock_text_block = atypes.TextBlock(
+            type="text",
+            text="<pt>Resumo</pt>\n<en>Summary</en>",
+        )
+        mock_response = MagicMock()
+        mock_response.content = [mock_text_block]
+
+        mock_client = MagicMock()
+        mock_client.messages.create = AsyncMock(return_value=mock_response)
+
+        # Mock asyncpg to fail
+        mock_conn = AsyncMock()
+        mock_conn.execute = AsyncMock(side_effect=RuntimeError("Connection refused"))
+        mock_conn.close = AsyncMock()
+
+        agent = InsightAgent()
+
+        with (
+            patch("agents.insight.agent.query_gold_series", side_effect=mock_query_gold),
+            patch("agents.insight.agent.anthropic.AsyncAnthropic", return_value=mock_client),
+            patch("asyncpg.connect", AsyncMock(return_value=mock_conn)),
+            patch.dict(os.environ, {"DATABASE_URL": "postgresql://test:test@localhost/test"}),
+        ):
+            result = await agent._execute()
+
+        assert result.success is False
+        assert any("Postgres storage failed" in e for e in result.errors)
+
+    @pytest.mark.asyncio
+    async def test_partial_gold_data_with_warnings(self) -> None:
+        """When some series fail to read, agent should still proceed with warnings."""
+        call_count = 0
+
+        async def mock_query_gold(series: str, after: str | None = None) -> list[dict[str, Any]]:
+            nonlocal call_count
+            call_count += 1
+            if series == "bcb_1":
+                raise RuntimeError("Read error for bcb_1")
+            if series == "bcb_432":
+                return _make_gold_rows("bcb_432")
+            return []
+
+        mock_text_block = atypes.TextBlock(
+            type="text", text="<en>Summary</en>",
+        )
+        mock_response = MagicMock()
+        mock_response.content = [mock_text_block]
+
+        mock_client = MagicMock()
+        mock_client.messages.create = AsyncMock(return_value=mock_response)
+
+        mock_conn = AsyncMock()
+        mock_conn.execute = AsyncMock()
+        mock_conn.close = AsyncMock()
+
+        agent = InsightAgent()
+
+        with (
+            patch("agents.insight.agent.query_gold_series", side_effect=mock_query_gold),
+            patch("agents.insight.agent.anthropic.AsyncAnthropic", return_value=mock_client),
+            patch("asyncpg.connect", AsyncMock(return_value=mock_conn)),
+            patch.dict(os.environ, {"DATABASE_URL": "postgresql://test:test@localhost/test"}),
+        ):
+            result = await agent._execute()
+
+        assert result.success is True
+        assert any("bcb_1" in w for w in result.warnings)
+
+    @pytest.mark.asyncio
+    async def test_database_url_missing_raises(self) -> None:
+        """When DATABASE_URL is missing, _store_insights should raise ValueError."""
+        gold_data = {"bcb_432": _make_gold_rows("bcb_432")}
+
+        async def mock_query_gold(series: str, after: str | None = None) -> list[dict[str, Any]]:
+            return gold_data.get(series, [])
+
+        mock_text_block = atypes.TextBlock(
+            type="text", text="<en>Summary</en>",
+        )
+        mock_response = MagicMock()
+        mock_response.content = [mock_text_block]
+
+        mock_client = MagicMock()
+        mock_client.messages.create = AsyncMock(return_value=mock_response)
+
+        agent = InsightAgent()
+
+        with (
+            patch("agents.insight.agent.query_gold_series", side_effect=mock_query_gold),
+            patch("agents.insight.agent.anthropic.AsyncAnthropic", return_value=mock_client),
+            patch.dict(os.environ, {"DATABASE_URL": ""}, clear=False),
+        ):
+            result = await agent._execute()
+
+        assert result.success is False
+        assert any("Postgres storage failed" in e for e in result.errors)

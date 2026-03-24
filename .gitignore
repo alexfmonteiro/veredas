@@ -34,6 +34,14 @@ data/local/
 frontend/dist/
 frontend/node_modules/
 
+# Terraform
+infra/terraform/.terraform/
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.backup
+infra/terraform/*.tfvars
+!infra/terraform/*.tfvars.example
+infra/terraform/.terraform.lock.hcl
+
 # OS
 .DS_Store
 Thumbs.db

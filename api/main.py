@@ -451,6 +451,14 @@ async def insights_latest() -> InsightResponse:
         await conn.close()
 
 
+@app.get("/api/debug-sentry", include_in_schema=False)
+async def debug_sentry() -> dict[str, str]:
+    """Raise a test exception to verify Sentry is capturing errors."""
+    if os.environ.get("APP_ENV", "development") == "production":
+        raise HTTPException(status_code=404, detail="Not found")
+    raise RuntimeError("Sentry test error from BR Economic Pulse API")
+
+
 @app.post(
     "/api/internal/sync",
     include_in_schema=False,

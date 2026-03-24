@@ -145,6 +145,23 @@ async def test_security_headers() -> None:
 
 
 @pytest.mark.asyncio
+async def test_debug_sentry_raises_in_dev() -> None:
+    transport = ASGITransport(app=app, raise_app_exceptions=False)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get("/api/debug-sentry")
+    assert resp.status_code == 500
+
+
+@pytest.mark.asyncio
+async def test_debug_sentry_hidden_in_production() -> None:
+    transport = ASGITransport(app=app)
+    with patch.dict(os.environ, {"APP_ENV": "production"}):
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get("/api/debug-sentry")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_sync_not_in_openapi() -> None:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:

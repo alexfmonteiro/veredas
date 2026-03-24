@@ -145,6 +145,23 @@ async def test_security_headers() -> None:
 
 
 @pytest.mark.asyncio
+async def test_sentry_tunnel_rejects_invalid_envelope() -> None:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post("/api/sentry-tunnel", content=b"not-json")
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_sentry_tunnel_rejects_disallowed_dsn() -> None:
+    envelope = b'{"dsn":"https://key@evil.example.com/123"}\n{}'
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post("/api/sentry-tunnel", content=envelope)
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
 async def test_debug_sentry_raises_in_dev() -> None:
     transport = ASGITransport(app=app, raise_app_exceptions=False)
     async with AsyncClient(transport=transport, base_url="http://test") as client:

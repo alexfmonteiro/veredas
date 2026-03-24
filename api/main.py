@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
+import httpx
 import asyncpg
 import sentry_sdk
 import structlog
@@ -449,6 +450,39 @@ async def insights_latest() -> InsightResponse:
         return InsightResponse()
     finally:
         await conn.close()
+
+
+@app.post("/api/sentry-tunnel", include_in_schema=False)
+async def sentry_tunnel(request: Request) -> Response:
+    """Proxy Sentry envelopes to bypass ad blockers."""
+    body = await request.body()
+    try:
+        header_line = body.split(b"\n", 1)[0]
+        header = json.loads(header_line)
+    except (ValueError, IndexError):
+        raise HTTPException(status_code=400, detail="Invalid envelope")
+
+    dsn = header.get("dsn")
+    if not dsn:
+        raise HTTPException(status_code=400, detail="Missing DSN in envelope header")
+
+    # Only allow forwarding to our own Sentry org
+    allowed_host = "o4511094352707584.ingest.us.sentry.io"
+    if allowed_host not in dsn:
+        raise HTTPException(status_code=403, detail="Disallowed DSN")
+
+    # Extract project ID from DSN (last path segment)
+    project_id = dsn.rstrip("/").rsplit("/", 1)[-1]
+    upstream_url = f"https://{allowed_host}/api/{project_id}/envelope/"
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            upstream_url,
+            content=body,
+            headers={"Content-Type": "application/x-sentry-envelope"},
+        )
+
+    return Response(status_code=resp.status_code)
 
 
 @app.get("/api/debug-sentry", include_in_schema=False)

@@ -12,7 +12,8 @@ if (sentryDsn) {
     dsn: sentryDsn,
     environment: import.meta.env.MODE,
     tracesSampleRate: 0.1,
-    enabled: import.meta.env.PROD,
+    tunnel: '/api/sentry-tunnel',
+    sendDefaultPii: true,
   });
 }
 

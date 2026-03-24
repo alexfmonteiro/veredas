@@ -289,6 +289,7 @@ class QueryAgent(BaseAgent):
             label = get_display_label(series_id)
             meta = SERIES_DISPLAY.get(series_id, {})
             unit = meta.get("unit", "")
+            desc = meta.get("description", "")
             rows = await query_gold_series(series_id)
 
             if not rows:
@@ -304,9 +305,12 @@ class QueryAgent(BaseAgent):
             )
 
             if series_id in relevant_series:
-                # Detailed: last N data points for series the user asked about
+                # Detailed: description + last N data points
+                header = f"{label} ({unit})"
+                if desc:
+                    header += f" — {desc}"
                 recent = rows[-_MAX_CONTEXT_POINTS:]
-                lines.append(f"{label} ({unit}) — last {len(recent)} values:")
+                lines.append(f"{header}\nLast {len(recent)} values:")
                 for row in recent:
                     d = (
                         row["date"].strftime("%Y-%m-%d")
@@ -315,8 +319,12 @@ class QueryAgent(BaseAgent):
                     )
                     lines.append(f"  {d}: {row['value']}")
             else:
-                # Compact: one-line summary for context
-                lines.append(f"{label} ({unit}): latest {latest_val} on {latest_date}")
+                # Compact: description + one-line summary
+                summary = f"{label} ({unit})"
+                if desc:
+                    summary += f" [{desc}]"
+                summary += f": latest {latest_val} on {latest_date}"
+                lines.append(summary)
 
         return "\n".join(lines)
 

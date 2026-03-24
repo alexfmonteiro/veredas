@@ -91,7 +91,9 @@ export const translations = {
       bcb_1: 'How many Brazilian reais one US dollar buys. A rising rate means the real is weakening, making imports more expensive.',
       ibge_pnad: 'Share of the working-age population actively looking for work but unable to find it. Measured quarterly by IBGE\'s household survey.',
       ibge_gdp: 'Total value of goods and services produced in Brazil, in billions of reais. Used as the broadest measure of economic activity.',
-      tesouro: 'Yield on Brazilian government bonds (Tesouro Direto). Higher yields usually reflect higher perceived risk or tighter monetary policy.',
+      tesouro_prefixado_curto: 'Average yield of pre-fixed government bonds (Tesouro Prefixado) maturing within 3 years. Reflects near-term interest rate expectations.',
+      tesouro_prefixado_longo: 'Average yield of pre-fixed government bonds (Tesouro Prefixado) maturing beyond 3 years. Reflects long-term rate expectations. Compare with short-term to gauge yield curve slope.',
+      tesouro_ipca: 'Average real yield of inflation-linked government bonds (IPCA+, Educa+, Renda+). Shows the real interest rate demanded by the market above inflation.',
     },
     common: {
       fresh: 'Fresh',
@@ -191,7 +193,9 @@ export const translations = {
       bcb_1: 'Quantos reais um dolar americano compra. Taxa em alta significa que o real esta perdendo valor, encarecendo importacoes.',
       ibge_pnad: 'Parcela da populacao economicamente ativa que procura emprego e nao encontra. Medida trimestralmente pela PNAD do IBGE.',
       ibge_gdp: 'Valor total de bens e servicos produzidos no Brasil, em bilhoes de reais. E a medida mais ampla da atividade economica.',
-      tesouro: 'Rentabilidade dos titulos publicos federais (Tesouro Direto). Rendimentos mais altos costumam refletir maior percepcao de risco ou politica monetaria mais apertada.',
+      tesouro_prefixado_curto: 'Media das taxas dos titulos prefixados (Tesouro Prefixado) com vencimento em ate 3 anos. Reflete as expectativas de juros no curto prazo.',
+      tesouro_prefixado_longo: 'Media das taxas dos titulos prefixados (Tesouro Prefixado) com vencimento acima de 3 anos. Reflete expectativas de juros no longo prazo. Compare com o curto para avaliar a inclinacao da curva.',
+      tesouro_ipca: 'Media dos juros reais dos titulos atrelados a inflacao (IPCA+, Educa+, Renda+). Mostra a taxa real de juros que o mercado exige acima da inflacao.',
     },
     common: {
       fresh: 'Atualizado',

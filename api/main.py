@@ -505,9 +505,16 @@ async def trigger_sync(
 
     gold_dir = get_gold_dir()
 
-    # If using local storage (dev mode), just count existing files
-    storage_backend = os.environ.get("STORAGE_BACKEND", "local")
-    if storage_backend == "local":
+    # Always attempt R2 sync — the endpoint is auth-protected so it's only
+    # called intentionally.  Fall back to local file count only when R2
+    # credentials are not configured (e.g. pure local dev).
+    from api.sync import sync_gold_from_r2
+
+    files_synced, duration_ms, errors = await sync_gold_from_r2(gold_dir)
+
+    if errors and errors[0].startswith("Cannot initialize R2"):
+        # R2 not configured — fall back to counting local files
+        logger.info("sync_fallback_local", reason=errors[0])
         gold_dir.mkdir(parents=True, exist_ok=True)
         parquet_files = list(gold_dir.glob("*.parquet"))
         return SyncResult(
@@ -515,11 +522,6 @@ async def trigger_sync(
             files_synced=len(parquet_files),
             sync_duration_ms=0.0,
         )
-
-    # Production: download gold files from R2 to persistent volume
-    from api.sync import sync_gold_from_r2
-
-    files_synced, duration_ms, errors = await sync_gold_from_r2(gold_dir)
 
     return SyncResult(
         success=len(errors) == 0,

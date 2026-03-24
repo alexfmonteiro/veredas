@@ -35,13 +35,19 @@ class TransformationTask(BaseTask):
         return "transformation"
 
     async def _discover_series(self) -> list[str]:
-        """Discover all series with bronze data."""
+        """Discover all series with bronze data or a bronze_source reference."""
         all_keys = await self._storage.list_keys("bronze")
-        series_set: set[str] = set()
+        bronze_set: set[str] = set()
         for key in all_keys:
             parts = key.split("/")
             if len(parts) >= 2:
-                series_set.add(parts[1])
+                bronze_set.add(parts[1])
+
+        series_set = set(bronze_set)
+        # Include derived feeds whose bronze_source has data
+        for feed_id, feed in self._feed_configs.items():
+            if feed.bronze_source and feed.bronze_source in bronze_set:
+                series_set.add(feed_id)
         return sorted(series_set)
 
     async def _execute(self) -> TaskResult:
@@ -169,10 +175,28 @@ class TransformationTask(BaseTask):
 
         # Wrap in outer query to filter out rows where TRY_CAST produced NULLs
         null_filters = " AND ".join(f"{alias} IS NOT NULL" for alias in silver_aliases)
-        return f"""
+        base_sql = f"""
             SELECT * FROM ({inner_sql}) _silver
             WHERE {null_filters}
         """
+
+        # Optionally aggregate (e.g. AVG across maturities per date)
+        if feed.processing.silver.aggregation == "avg":
+            return f"""
+                SELECT
+                    date,
+                    AVG(value) AS value,
+                    ANY_VALUE(series) AS series,
+                    ANY_VALUE(unit) AS unit,
+                    MAX(_cleaned_at) AS _cleaned_at,
+                    ANY_VALUE(_transformation_version) AS _transformation_version,
+                    MAX(_ingested_at) AS _ingested_at
+                FROM ({base_sql}) _agg
+                GROUP BY date
+                ORDER BY date
+            """
+
+        return base_sql
 
     async def _transform_series(self, series: str) -> int:
         """Transform a single series from bronze -> silver -> gold."""
@@ -181,8 +205,10 @@ class TransformationTask(BaseTask):
             raise ValueError(f"No feed config for series {series}")
 
         # Read watermark and find new bronze files
+        # Derived feeds read bronze from their parent feed's directory
+        bronze_feed = feed.bronze_source or series
         watermark = await self._read_watermark(series)
-        new_keys = await self._get_bronze_keys_since_watermark(series, watermark)
+        new_keys = await self._get_bronze_keys_since_watermark(bronze_feed, watermark)
 
         if not new_keys:
             logger.info("transformation_no_new_data", series=series)

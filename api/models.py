@@ -244,6 +244,7 @@ class SilverProcessingConfig(BaseModel):
     dedup_columns: list[str] = Field(default_factory=list)
     dedup_order_by: str = "_ingested_at DESC"
     pre_filter: str | None = None
+    aggregation: Literal["avg"] | None = None
 
 
 class FeedProcessingConfig(BaseModel):
@@ -293,6 +294,7 @@ class FeedConfig(BaseModel):
     processing: FeedProcessingConfig = Field(default_factory=FeedProcessingConfig)
     quality: FeedQualityConfig = Field(default_factory=FeedQualityConfig)
     metadata: FeedMetadataConfig = Field(default_factory=FeedMetadataConfig)
+    bronze_source: str | None = None
 
 
 # --- Query Models ---

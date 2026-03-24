@@ -255,7 +255,9 @@ class TestInsightAgentExecute:
             "bcb_1": _make_gold_rows("bcb_1"),
             "ibge_pnad": _make_gold_rows("ibge_pnad"),
             "ibge_gdp": _make_gold_rows("ibge_gdp"),
-            "tesouro": _make_gold_rows("tesouro"),
+            "tesouro_prefixado_curto": _make_gold_rows("tesouro_prefixado_curto"),
+            "tesouro_prefixado_longo": _make_gold_rows("tesouro_prefixado_longo"),
+            "tesouro_ipca": _make_gold_rows("tesouro_ipca"),
         }
 
         async def mock_query_gold(series: str, after: str | None = None) -> list[dict[str, Any]]:

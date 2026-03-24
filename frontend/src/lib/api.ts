@@ -138,7 +138,9 @@ const SERIES_LABELS: Record<string, string> = {
   bcb_1: 'USD/BRL',
   ibge_pnad: 'Taxa de Desemprego',
   ibge_gdp: 'PIB',
-  tesouro: 'Tesouro Prefixado',
+  tesouro_prefixado_curto: 'Prefixado Curto',
+  tesouro_prefixado_longo: 'Prefixado Longo',
+  tesouro_ipca: 'Juros Real (IPCA+)',
 };
 
 export function getSeriesLabel(seriesId: string): string {
@@ -197,5 +199,7 @@ export const SERIES: SeriesConfig[] = [
   { id: 'bcb_1', label: 'USD/BRL', unit: 'R$', source: 'BCB', color: '#22c55e', freshnessHours: 72 },
   { id: 'ibge_pnad', label: 'Taxa de Desemprego', unit: '%', source: 'IBGE', color: '#f59e0b', freshnessHours: 2400 },
   { id: 'ibge_gdp', label: 'PIB', unit: 'R$ bi', source: 'IBGE', color: '#06b6d4', freshnessHours: 1080 },
-  { id: 'tesouro', label: 'Tesouro Prefixado', unit: '% a.a.', source: 'Tesouro', color: '#ec4899', freshnessHours: 72 },
+  { id: 'tesouro_prefixado_curto', label: 'Prefixado Curto', unit: '% a.a.', source: 'Tesouro', color: '#ec4899', freshnessHours: 72 },
+  { id: 'tesouro_prefixado_longo', label: 'Prefixado Longo', unit: '% a.a.', source: 'Tesouro', color: '#f472b6', freshnessHours: 72 },
+  { id: 'tesouro_ipca', label: 'Juros Real (IPCA+)', unit: '% a.a.', source: 'Tesouro', color: '#fb923c', freshnessHours: 72 },
 ];

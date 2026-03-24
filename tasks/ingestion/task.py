@@ -78,6 +78,9 @@ class IngestionTask(BaseTask):
 
         try:
             for feed_id, feed in self._feed_configs.items():
+                # Derived feeds read bronze from another feed; skip ingestion
+                if feed.bronze_source:
+                    continue
                 try:
                     rows = await self._fetch_feed(client, feed)
                     total_rows += rows

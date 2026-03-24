@@ -278,3 +278,81 @@ async def test_transformation_latest_only_dedup(
 
     # Should have 3 unique dates, not 4
     assert table.num_rows == 3
+
+
+TESOURO_SAMPLE_DATA = [
+    # Two Prefixado bonds (short and long) on same date
+    {"tipo_titulo": "Tesouro Prefixado", "data_vencimento": "01/01/2028", "data_base": "01/01/2025", "taxa_compra_manha": "13,00", "taxa_venda_manha": "", "pu_compra_manha": "", "pu_venda_manha": "", "pu_base_manha": ""},
+    {"tipo_titulo": "Tesouro Prefixado", "data_vencimento": "01/01/2027", "data_base": "01/01/2025", "taxa_compra_manha": "12,50", "taxa_venda_manha": "", "pu_compra_manha": "", "pu_venda_manha": "", "pu_base_manha": ""},
+    {"tipo_titulo": "Tesouro Prefixado com Juros Semestrais", "data_vencimento": "01/01/2031", "data_base": "01/01/2025", "taxa_compra_manha": "14,00", "taxa_venda_manha": "", "pu_compra_manha": "", "pu_venda_manha": "", "pu_base_manha": ""},
+    # IPCA+ bonds on same date
+    {"tipo_titulo": "Tesouro IPCA+", "data_vencimento": "15/05/2029", "data_base": "01/01/2025", "taxa_compra_manha": "7,20", "taxa_venda_manha": "", "pu_compra_manha": "", "pu_venda_manha": "", "pu_base_manha": ""},
+    {"tipo_titulo": "Tesouro IPCA+ com Juros Semestrais", "data_vencimento": "15/08/2032", "data_base": "01/01/2025", "taxa_compra_manha": "7,40", "taxa_venda_manha": "", "pu_compra_manha": "", "pu_venda_manha": "", "pu_base_manha": ""},
+    {"tipo_titulo": "Tesouro Educa+", "data_vencimento": "15/12/2030", "data_base": "01/01/2025", "taxa_compra_manha": "7,60", "taxa_venda_manha": "", "pu_compra_manha": "", "pu_venda_manha": "", "pu_base_manha": ""},
+    # Selic bond (should be excluded from all 3 derived feeds)
+    {"tipo_titulo": "Tesouro Selic", "data_vencimento": "01/03/2029", "data_base": "01/01/2025", "taxa_compra_manha": "0,00", "taxa_venda_manha": "", "pu_compra_manha": "", "pu_venda_manha": "", "pu_base_manha": ""},
+]
+
+
+@pytest.mark.asyncio()
+async def test_transformation_aggregation_avg(
+    tmp_path: Path,
+    feed_configs: dict[str, FeedConfig],
+) -> None:
+    """Derived feeds with aggregation=avg should produce one averaged row per date."""
+    # Write tesouro bronze data (shared source)
+    _write_bronze_parquet(tmp_path, "tesouro", TESOURO_SAMPLE_DATA)
+
+    # Only include tesouro + prefixado_curto for this test
+    configs = {
+        "tesouro": feed_configs["tesouro"],
+        "tesouro_prefixado_curto": feed_configs["tesouro_prefixado_curto"],
+    }
+
+    storage = LocalStorageBackend(tmp_path)
+    task = TransformationTask(storage=storage, feed_configs=configs)
+    result = await task.run()
+    assert result.success is True
+
+    # Derived feed should produce gold from tesouro's bronze
+    assert await storage.exists("gold/tesouro_prefixado_curto.parquet")
+
+    gold_data = await storage.read("gold/tesouro_prefixado_curto.parquet")
+    table = pq.read_table(io.BytesIO(gold_data))
+
+    # Should have 1 row (1 date, aggregated)
+    assert table.num_rows == 1
+    # Value should be avg of short-maturity Prefixado bonds (<=3y from 2025-01-01)
+    value = table.column("value")[0].as_py()
+    assert isinstance(value, float)
+    assert value > 0
+
+
+@pytest.mark.asyncio()
+async def test_transformation_bronze_source(
+    tmp_path: Path,
+    feed_configs: dict[str, FeedConfig],
+) -> None:
+    """Derived feeds with bronze_source should read from parent's bronze directory."""
+    _write_bronze_parquet(tmp_path, "tesouro", TESOURO_SAMPLE_DATA)
+
+    configs = {
+        "tesouro": feed_configs["tesouro"],
+        "tesouro_ipca": feed_configs["tesouro_ipca"],
+    }
+
+    storage = LocalStorageBackend(tmp_path)
+    task = TransformationTask(storage=storage, feed_configs=configs)
+    result = await task.run()
+    assert result.success is True
+
+    # IPCA feed should produce gold even though it has no own bronze directory
+    assert await storage.exists("gold/tesouro_ipca.parquet")
+
+    gold_data = await storage.read("gold/tesouro_ipca.parquet")
+    table = pq.read_table(io.BytesIO(gold_data))
+
+    # Should have 1 row (1 date, avg of 3 IPCA-family bonds: 7.20, 7.40, 7.60)
+    assert table.num_rows == 1
+    value = table.column("value")[0].as_py()
+    assert abs(value - 7.4) < 0.01

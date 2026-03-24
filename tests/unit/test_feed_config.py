@@ -251,13 +251,16 @@ class TestFeedConfigLoader:
     def test_loads_production_feeds(self) -> None:
         """Verify the actual data/feeds/ YAML files load correctly."""
         configs = load_feed_configs("data/feeds")
-        assert len(configs) == 6
+        assert len(configs) == 9
         assert "bcb_432" in configs
         assert "bcb_433" in configs
         assert "bcb_1" in configs
         assert "ibge_pnad" in configs
         assert "ibge_gdp" in configs
         assert "tesouro" in configs
+        assert "tesouro_prefixado_curto" in configs
+        assert "tesouro_prefixado_longo" in configs
+        assert "tesouro_ipca" in configs
 
         # Verify IBGE PNAD has all 11 fields
         ibge = configs["ibge_pnad"]
@@ -267,6 +270,12 @@ class TestFeedConfigLoader:
         tesouro = configs["tesouro"]
         assert tesouro.source.format == SourceFormat.CSV
         assert tesouro.source.csv_separator == ";"
+
+        # Verify derived feeds reference tesouro bronze
+        for derived_id in ("tesouro_prefixado_curto", "tesouro_prefixado_longo", "tesouro_ipca"):
+            derived = configs[derived_id]
+            assert derived.bronze_source == "tesouro"
+            assert derived.processing.silver.aggregation == "avg"
 
     def test_bcb_backfill_fields(self) -> None:
         """BCB feeds should have backfill configuration."""

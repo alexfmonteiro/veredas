@@ -15,20 +15,25 @@ logger = structlog.get_logger()
 # Each pattern maps to a lookup strategy name (currently only "latest_value").
 # ---------------------------------------------------------------------------
 
+_METRIC_TERMS = (
+    r"selic|ipca|dolar|dollar|usd|brl|cambio|câmbio|desemprego|unemployment"
+    r"|pib|gdp|tesouro|prefixado|juros real|ntn-b"
+)
+
 DIRECT_LOOKUP_PATTERNS: dict[re.Pattern[str], str] = {
     re.compile(
         r"(what|qual|quanto).*(current|atual|hoje|today|now|latest|último|ultima)"
-        r".*(selic|ipca|dolar|dollar|usd|brl|cambio|câmbio|desemprego|unemployment|pib|gdp|tesouro)",
+        rf".*({_METRIC_TERMS})",
         re.IGNORECASE,
     ): "latest_value",
     re.compile(
         r"(what|qual).*(latest|último|ultima|last|recent)"
-        r".*(selic|ipca|dolar|dollar|usd|brl|cambio|câmbio|desemprego|unemployment|pib|gdp|rate|taxa|tesouro)",
+        rf".*({_METRIC_TERMS}|rate|taxa)",
         re.IGNORECASE,
     ): "latest_value",
     re.compile(
-        r"(last|ultimo|última).*(value|valor|dado).*(selic|ipca|dolar|"
-        r"dollar|usd|brl|cambio|câmbio|desemprego|unemployment|pib|gdp|tesouro)",
+        r"(last|ultimo|última).*(value|valor|dado)"
+        rf".*({_METRIC_TERMS})",
         re.IGNORECASE,
     ): "latest_value",
 }
@@ -49,7 +54,12 @@ METRIC_KEYWORDS: dict[str, str] = {
     "unemployment": "ibge_pnad",
     "pib": "ibge_gdp",
     "gdp": "ibge_gdp",
-    "tesouro": "tesouro",
+    "tesouro": "tesouro_prefixado_curto",
+    "prefixado": "tesouro_prefixado_curto",
+    "prefixado curto": "tesouro_prefixado_curto",
+    "prefixado longo": "tesouro_prefixado_longo",
+    "juros real": "tesouro_ipca",
+    "ntn-b": "tesouro_ipca",
 }
 
 
@@ -94,7 +104,8 @@ class QuerySkillRouter:
     def _extract_metric(question: str) -> str:
         """Return the canonical series ID for the first keyword found."""
         lowered = question.lower()
-        for keyword, series_id in METRIC_KEYWORDS.items():
+        # Check longest keywords first so "prefixado longo" matches before "prefixado"
+        for keyword, series_id in sorted(METRIC_KEYWORDS.items(), key=lambda kv: len(kv[0]), reverse=True):
             if keyword in lowered:
                 return series_id
         return "unknown"

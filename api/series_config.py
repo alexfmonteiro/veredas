@@ -13,7 +13,9 @@ SERIES_DISPLAY: dict[str, dict[str, str]] = {
     "bcb_1": {"label": "USD/BRL", "unit": "R$", "source": "BCB", "color": "#22c55e", "freshness_hours": "72"},
     "ibge_pnad": {"label": "Taxa de Desemprego", "unit": "%", "source": "IBGE", "color": "#f59e0b", "freshness_hours": "2400"},
     "ibge_gdp": {"label": "PIB", "unit": "R$ bi", "source": "IBGE", "color": "#06b6d4", "freshness_hours": "1080"},
-    "tesouro": {"label": "Tesouro Prefixado", "unit": "% a.a.", "source": "Tesouro", "color": "#ec4899", "freshness_hours": "72"},
+    "tesouro_prefixado_curto": {"label": "Prefixado Curto", "unit": "% a.a.", "source": "Tesouro", "color": "#ec4899", "freshness_hours": "72"},
+    "tesouro_prefixado_longo": {"label": "Prefixado Longo", "unit": "% a.a.", "source": "Tesouro", "color": "#f472b6", "freshness_hours": "72"},
+    "tesouro_ipca": {"label": "Juros Real (IPCA+)", "unit": "% a.a.", "source": "Tesouro", "color": "#fb923c", "freshness_hours": "72"},
 }
 
 

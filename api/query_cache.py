@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import urllib.parse
 
 import httpx
 import structlog
@@ -36,6 +37,10 @@ def _cache_key(question: str, language: str, gold_generation: str) -> str:
     return f"qcache:{digest}"
 
 
+def _upstash_headers(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
 async def get_cached_response(question: str, language: str) -> QueryResponse | None:
     """Return cached QueryResponse for this question, or None on miss/error."""
     redis_url = os.environ.get("UPSTASH_REDIS_URL", "")
@@ -51,10 +56,14 @@ async def get_cached_response(question: str, language: str) -> QueryResponse | N
         async with httpx.AsyncClient() as client:
             resp = await client.post(
                 f"{redis_url}/get/{key}",
-                headers={"Authorization": f"Bearer {redis_token}"},
+                headers=_upstash_headers(redis_token),
                 timeout=5.0,
             )
-            result = resp.json().get("result")
+            body = resp.json()
+            if "error" in body:
+                logger.warning("query_cache_get_rejected", error=body["error"])
+                return None
+            result = body.get("result")
             if result is None:
                 return None
             return QueryResponse.model_validate_json(result)
@@ -77,15 +86,23 @@ async def set_cached_response(
         generation = _get_gold_generation()
         key = _cache_key(question, language, generation)
         value = response.model_dump_json()
+        headers = _upstash_headers(redis_token)
 
         async with httpx.AsyncClient() as client:
-            # Use Upstash REST body format for large values
-            await client.post(
-                redis_url,
-                headers={"Authorization": f"Bearer {redis_token}"},
-                json=["SET", key, value, "EX", str(_CACHE_TTL_SECONDS)],
+            # URL-path format — same pattern the rate_limiter uses reliably.
+            # URL-encode the value so slashes / special chars are safe in the path.
+            encoded_value = urllib.parse.quote(value, safe="")
+            resp = await client.post(
+                f"{redis_url}/set/{key}/{encoded_value}/ex/{_CACHE_TTL_SECONDS}",
+                headers=headers,
                 timeout=5.0,
             )
-        logger.debug("query_cache_set", key=key)
+            body = resp.json()
+            if "error" in body:
+                logger.warning(
+                    "query_cache_set_rejected", error=body["error"], key=key
+                )
+            else:
+                logger.info("query_cache_set", key=key, generation=generation)
     except Exception as exc:
         logger.warning("query_cache_set_error", error=str(exc))

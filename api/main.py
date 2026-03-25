@@ -62,6 +62,17 @@ _conversation_history: dict[str, list[dict[str, str]]] = {}
 _MAX_HISTORY_TURNS = 10
 _SESSION_COOKIE_NAME = "br_ep_session"
 
+# Strong references to fire-and-forget tasks so they aren't garbage-collected
+# before completion.  See: https://docs.python.org/3/library/asyncio-task.html
+_background_tasks: set[asyncio.Task[None]] = set()
+
+
+def _spawn_background(coro: Any) -> None:
+    """Schedule a coroutine as a background task with a saved reference."""
+    task = asyncio.ensure_future(coro)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -352,10 +363,10 @@ async def post_query(body: QueryRequest, request: Request, response: Response) -
 
     # Cache FULL_LLM responses (fire-and-forget)
     if query_resp.tier_used == QueryTier.FULL_LLM:
-        asyncio.ensure_future(set_cached_response(body.question, body.language, query_resp))
+        _spawn_background(set_cached_response(body.question, body.language, query_resp))
 
     # Fire-and-forget audit logging (don't block the response)
-    asyncio.ensure_future(log_query(
+    _spawn_background(log_query(
         question=body.question,
         system_prompt=agent.last_system_prompt,
         answer=query_resp.answer,
@@ -484,7 +495,7 @@ async def query_stream(
 
         # Cache FULL_LLM responses (fire-and-forget)
         if qr.tier_used == QueryTier.FULL_LLM:
-            asyncio.ensure_future(set_cached_response(body.question, body.language, qr))
+            _spawn_background(set_cached_response(body.question, body.language, qr))
 
     return StreamingResponse(
         _event_generator(),

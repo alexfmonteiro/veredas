@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import urllib.parse
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -107,18 +106,14 @@ async def test_cache_roundtrip_with_mocked_redis(_mock_gold_dir: None) -> None:
     async def mock_post(url: str, **kwargs: object) -> MagicMock:
         mock_resp = MagicMock()
         if "/get/" in url:
-            # GET command — URL format: {url}/get/{key}
             key = url.split("/get/")[1]
             value = store.get(key)
             mock_resp.json.return_value = {"result": value}
-        elif "/set/" in url:
-            # SET command — URL format: {url}/set/{key}/{encoded_value}/ex/{ttl}
-            parts = url.split("/set/")[1].split("/")
-            key = parts[0]
-            encoded_value = parts[1]
-            store[key] = urllib.parse.unquote(encoded_value)
-            mock_resp.json.return_value = {"result": "OK"}
         else:
+            # SET command via body: ["SET", key, value, "EX", ttl]
+            body = kwargs.get("json", [])
+            if isinstance(body, list) and len(body) >= 3 and body[0] == "SET":
+                store[body[1]] = body[2]
             mock_resp.json.return_value = {"result": "OK"}
         return mock_resp
 

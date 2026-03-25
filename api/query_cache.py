@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import hashlib
 import os
-import urllib.parse
 
 import httpx
 import structlog
@@ -86,15 +85,12 @@ async def set_cached_response(
         generation = _get_gold_generation()
         key = _cache_key(question, language, generation)
         value = response.model_dump_json()
-        headers = _upstash_headers(redis_token)
 
         async with httpx.AsyncClient() as client:
-            # URL-path format — same pattern the rate_limiter uses reliably.
-            # URL-encode the value so slashes / special chars are safe in the path.
-            encoded_value = urllib.parse.quote(value, safe="")
             resp = await client.post(
-                f"{redis_url}/set/{key}/{encoded_value}/ex/{_CACHE_TTL_SECONDS}",
-                headers=headers,
+                redis_url,
+                headers=_upstash_headers(redis_token),
+                json=["SET", key, value, "EX", _CACHE_TTL_SECONDS],
                 timeout=5.0,
             )
             body = resp.json()

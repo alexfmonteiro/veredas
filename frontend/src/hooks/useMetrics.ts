@@ -6,6 +6,8 @@ import {
   fetchAnomalyInsights,
   fetchSyncStatus,
   fetchQualityLatest,
+  fetchRunHistory,
+  fetchQueryUsage,
   getAfterDate,
 } from '@/lib/api';
 import type {
@@ -14,6 +16,8 @@ import type {
   InsightResponse,
   SyncStatusResponse,
   QualityLatest,
+  RunHistoryResponse,
+  QueryUsageResponse,
   TimeRange,
 } from '@/lib/api';
 
@@ -68,6 +72,24 @@ export function useQualityLatest() {
   return useQuery<QualityLatest>({
     queryKey: ['quality', 'latest'],
     queryFn: fetchQualityLatest,
+    staleTime: 60 * 1000,
+    retry: 1,
+  });
+}
+
+export function useRunHistory(limit?: number) {
+  return useQuery<RunHistoryResponse>({
+    queryKey: ['runs', limit],
+    queryFn: () => fetchRunHistory(limit),
+    staleTime: 60 * 1000,
+    retry: 1,
+  });
+}
+
+export function useQueryUsage() {
+  return useQuery<QueryUsageResponse>({
+    queryKey: ['query-usage'],
+    queryFn: fetchQueryUsage,
     staleTime: 60 * 1000,
     retry: 1,
   });

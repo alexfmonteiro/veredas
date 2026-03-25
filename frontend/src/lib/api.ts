@@ -272,6 +272,31 @@ export const SERIES: SeriesConfig[] = [
   { id: 'tesouro_ipca', label: 'Juros Real (IPCA+)', unit: '% a.a.', source: 'Tesouro', color: '#fb923c', freshnessHours: 72 },
 ];
 
+// --- Query Usage types ---
+
+export interface TierBreakdown {
+  tier: string;
+  count: number;
+  tokens: number;
+  cost_usd: number;
+}
+
+export interface QueryUsageResponse {
+  total_queries: number;
+  total_tokens: number;
+  total_cost_usd: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  avg_tokens_per_query: number;
+  avg_duration_ms: number;
+  by_tier: TierBreakdown[];
+  today: { queries: number; cost_usd: number };
+  error?: string;
+}
+
+export const fetchQueryUsage = (): Promise<QueryUsageResponse> =>
+  fetchJSON('/api/query/usage');
+
 // --- Run History Fetchers ---
 
 export const fetchRunHistory = (limit?: number): Promise<RunHistoryResponse> =>

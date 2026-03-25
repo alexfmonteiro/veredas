@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
+import { LandingPage } from '@/pages/LandingPage';
 import { Dashboard } from '@/pages/Dashboard';
 import { AskPage } from '@/pages/AskPage';
 import { AnalyticsPage } from '@/pages/AnalyticsPage';
 import { QualityPage } from '@/pages/QualityPage';
 import { AboutPage } from '@/pages/AboutPage';
+import { AdminPage } from '@/pages/AdminPage';
 import { useLanguage } from '@/lib/LanguageContext';
 
 function LanguageToggle() {
@@ -51,7 +53,8 @@ function NavBar() {
         {/* Desktop nav */}
         <div className="hidden md:flex items-center gap-1">
           <NavLink to="/" end className={linkClass}>{t.nav.home}</NavLink>
-          <NavLink to="/dashboard" className={linkClass}>{t.nav.dashboard}</NavLink>
+          <NavLink to="/dashboard" end className={linkClass}>{t.nav.dashboard}</NavLink>
+          <NavLink to="/analytics" className={linkClass}>{t.nav.analytics}</NavLink>
           <NavLink to="/ask" className={linkClass}>{t.nav.askAi}</NavLink>
           <NavLink to="/quality" className={linkClass}>{t.nav.quality}</NavLink>
           <NavLink to="/about" className={linkClass}>{t.nav.about}</NavLink>
@@ -80,7 +83,8 @@ function NavBar() {
       {open && (
         <div className="md:hidden border-t border-slate-800 px-4 py-2 space-y-1 bg-slate-900/95 backdrop-blur-sm">
           <NavLink to="/" end className={mobileLinkClass} onClick={() => setOpen(false)}>{t.nav.home}</NavLink>
-          <NavLink to="/dashboard" className={mobileLinkClass} onClick={() => setOpen(false)}>{t.nav.dashboard}</NavLink>
+          <NavLink to="/dashboard" end className={mobileLinkClass} onClick={() => setOpen(false)}>{t.nav.dashboard}</NavLink>
+          <NavLink to="/analytics" className={mobileLinkClass} onClick={() => setOpen(false)}>{t.nav.analytics}</NavLink>
           <NavLink to="/ask" className={mobileLinkClass} onClick={() => setOpen(false)}>{t.nav.askAi}</NavLink>
           <NavLink to="/quality" className={mobileLinkClass} onClick={() => setOpen(false)}>{t.nav.quality}</NavLink>
           <NavLink to="/about" className={mobileLinkClass} onClick={() => setOpen(false)}>{t.nav.about}</NavLink>
@@ -95,11 +99,13 @@ function App() {
     <BrowserRouter>
       <NavBar />
       <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/dashboard" element={<AnalyticsPage />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/analytics" element={<AnalyticsPage />} />
         <Route path="/ask" element={<AskPage />} />
         <Route path="/quality" element={<QualityPage />} />
         <Route path="/about" element={<AboutPage />} />
+        <Route path="/admin" element={<AdminPage />} />
       </Routes>
     </BrowserRouter>
   );

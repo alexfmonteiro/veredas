@@ -1,0 +1,12 @@
+FROM ghcr.io/marimo-team/marimo:latest-sql
+
+WORKDIR /app
+
+# Copy notebooks into the image — updated on every deploy
+COPY notebooks/ ./notebooks/
+
+EXPOSE 8080
+
+# Gallery mode: serves index of all notebooks in the directory
+# --token: requires auth; password read from MARIMO_TOKEN env var at runtime
+CMD ["sh", "-c", "marimo edit notebooks/ --host 0.0.0.0 -p 8080 --token --token-password=${MARIMO_TOKEN:-changeme}"]

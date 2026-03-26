@@ -1,9 +1,0 @@
-server:
-  port: __PORT__
-
-catalogs:
-  - name: veredas
-    type: rest
-    uri: __R2_CATALOG_URI__
-    warehouse: __R2_CATALOG_WAREHOUSE__
-    token: __R2_CATALOG_TOKEN__

@@ -50,65 +50,65 @@ def _(mo):
 
 @app.cell
 def _(conn, bucket, mo, series_input):
-    sid = series_input.value.strip()
-    if not sid:
+    _sid = series_input.value.strip()
+    if not _sid:
         mo.stop(True, mo.md("Enter a series ID above."))
 
-    layers = {}
+    _layers = {}
 
     # Bronze: files are at bronze/{series_id}/{timestamp}.parquet
     try:
-        df = conn.execute(f"""
+        _df = conn.execute(f"""
             SELECT 'bronze' AS layer,
                    count(*) AS rows,
                    min(date) AS min_date,
                    max(date) AS max_date,
                    count(*) - count(value) AS null_values
-            FROM read_parquet('r2://{bucket}/bronze/{sid}/*.parquet', union_by_name=true)
+            FROM read_parquet('r2://{bucket}/bronze/{_sid}/*.parquet', union_by_name=true)
         """).df()
-        layers["bronze"] = df
+        _layers["bronze"] = _df
     except Exception:
-        layers["bronze"] = None
+        _layers["bronze"] = None
 
     # Silver and gold: files are at {layer}/{series_id}.parquet
-    for layer in ["silver", "gold"]:
+    for _layer in ["silver", "gold"]:
         try:
-            df = conn.execute(f"""
-                SELECT '{layer}' AS layer,
+            _df = conn.execute(f"""
+                SELECT '{_layer}' AS layer,
                        count(*) AS rows,
                        min(date) AS min_date,
                        max(date) AS max_date,
                        count(*) - count(value) AS null_values
-                FROM read_parquet('r2://{bucket}/{layer}/{sid}.parquet')
+                FROM read_parquet('r2://{bucket}/{_layer}/{_sid}.parquet')
             """).df()
-            layers[layer] = df
+            _layers[_layer] = _df
         except Exception:
-            layers[layer] = None
+            _layers[_layer] = None
 
-    rows = [df for df in layers.values() if df is not None]
-    if rows:
+    _rows = [_v for _v in _layers.values() if _v is not None]
+    if _rows:
         import pandas as pd
-        summary = pd.concat(rows, ignore_index=True)
+        _summary = pd.concat(_rows, ignore_index=True)
         mo.md("### Layer Summary")
-        mo.ui.table(summary)
+        mo.ui.table(_summary)
     else:
-        mo.md(f"No parquet files found for `{sid}` in any layer.")
+        mo.md(f"No parquet files found for `{_sid}` in any layer.")
     return
 
 
 @app.cell
 def _(conn, bucket, mo, series_input):
-    sid = series_input.value.strip()
-    if not sid:
+    _sid = series_input.value.strip()
+    if not _sid:
         mo.stop(True)
 
     mo.md("### Gold Layer — Latest 20 Rows")
     try:
-        gold = conn.execute(f"""
-            SELECT * FROM read_parquet('r2://{bucket}/gold/{sid}.parquet')
+        _gold = conn.execute(f"""
+            SELECT * FROM read_parquet('r2://{bucket}/gold/{_sid}.parquet')
             ORDER BY date DESC LIMIT 20
         """).df()
-        mo.ui.table(gold)
+        mo.ui.table(_gold)
     except Exception as e:
         mo.md(f"Could not read gold layer: `{e}`")
     return

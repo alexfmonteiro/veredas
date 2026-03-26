@@ -113,19 +113,19 @@ def _(all_tables, conn, mo, schema_picker):
 
     # Get row counts and date ranges for each table
     summaries = []
-    for tbl in tables_in_schema:
+    for _tbl in tables_in_schema:
         try:
-            row = conn.execute(f"""
+            _row = conn.execute(f"""
                 SELECT
-                    '{tbl}' AS table_name,
+                    '{_tbl}' AS table_name,
                     count(*) AS rows,
                     min(date) AS first_date,
                     max(date) AS last_date
-                FROM catalog.{schema}.{tbl}
+                FROM catalog.{schema}.{_tbl}
             """).fetchone()
-            summaries.append(row)
+            summaries.append(_row)
         except Exception:
-            summaries.append((tbl, 0, None, None))
+            summaries.append((_tbl, 0, None, None))
 
     import pandas as pd
     summary_df = pd.DataFrame(
@@ -155,15 +155,15 @@ def _(mo, tables_in_schema):
 @app.cell
 def _(conn, mo, schema, table_picker):
     mo.stop(not table_picker.value)
-    tbl = table_picker.value
-    fqn = f"catalog.{schema}.{tbl}"
+    _tbl = table_picker.value
+    fqn = f"catalog.{schema}.{_tbl}"
 
     mo.md(f"## `{fqn}`")
 
-    mo.md("### Schema")
-    cols = conn.execute(f"DESCRIBE SELECT * FROM {fqn}").df()
-    mo.ui.table(cols)
-    return fqn, tbl
+    mo.md("### Column Schema")
+    _cols = conn.execute(f"DESCRIBE SELECT * FROM {fqn}").df()
+    mo.ui.table(_cols)
+    return (fqn,)
 
 
 # --- Table detail: stats ---
@@ -206,26 +206,26 @@ def _(conn, fqn, mo):
 
 
 @app.cell
-def _(conn, fqn, mo, tbl):
+def _(conn, fqn, mo):
     mo.md("### Time Series")
 
-    chart_df = conn.execute(f"""
+    _chart_df = conn.execute(f"""
         SELECT date, value FROM {fqn}
         WHERE value IS NOT NULL ORDER BY date
     """).df()
 
     import altair as alt
-    chart = (
-        alt.Chart(chart_df)
+    _chart = (
+        alt.Chart(_chart_df)
         .mark_line(strokeWidth=1.5)
         .encode(
             x=alt.X("date:T", title="Date"),
             y=alt.Y("value:Q", title="Value"),
             tooltip=["date:T", "value:Q"],
         )
-        .properties(width="container", height=300, title=tbl)
+        .properties(width="container", height=300, title=fqn)
     )
-    mo.ui.altair_chart(chart)
+    mo.ui.altair_chart(_chart)
     return
 
 

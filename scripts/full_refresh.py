@@ -107,12 +107,13 @@ def run_backfill(dry_run: bool = False) -> None:
         sys.exit(1)
 
 
-# ── Step 4: Upload gold to R2 ────────────────────────────────────────────
+# ── Step 4: Upload pipeline artifacts to R2 ──────────────────────────────
 
 
-async def upload_gold_to_r2(dry_run: bool = False) -> None:
-    _step("Step 4/5 — Uploading gold files to R2")
+async def upload_pipeline_to_r2(dry_run: bool = False) -> None:
+    _step("Step 4/5 — Uploading gold + silver + watermarks to R2")
     gold_dir = LOCAL_DATA / "gold"
+    silver_dir = LOCAL_DATA / "silver"
     if not gold_dir.exists():
         print("  ERROR: No gold directory found after pipeline run")
         sys.exit(1)
@@ -125,24 +126,58 @@ async def upload_gold_to_r2(dry_run: bool = False) -> None:
         print(f"  R2 not configured ({exc}), skipping upload")
         return
 
+    total_files = 0
+    total_bytes = 0
+
+    # Upload gold parquet files
     parquet_files = sorted(gold_dir.glob("*.parquet"))
     if not parquet_files:
         print("  ERROR: No .parquet files in gold/")
         sys.exit(1)
 
-    total_bytes = 0
     for path in parquet_files:
         r2_key = f"gold/{path.name}"
         size = path.stat().st_size
         total_bytes += size
+        total_files += 1
         if dry_run:
             print(f"  [dry-run] Would upload {r2_key} ({size / 1024:.1f} KB)")
         else:
             await r2.write(r2_key, path.read_bytes())
             print(f"  Uploaded {r2_key} ({size / 1024:.1f} KB)")
 
+    # Upload silver parquet files and watermarks so daily pipeline
+    # can merge new data with backfill history instead of starting fresh.
+    if silver_dir.exists():
+        # Silver parquet files (e.g. silver/bcb_1.parquet)
+        for path in sorted(silver_dir.glob("*.parquet")):
+            r2_key = f"silver/{path.name}"
+            size = path.stat().st_size
+            total_bytes += size
+            total_files += 1
+            if dry_run:
+                print(f"  [dry-run] Would upload {r2_key} ({size / 1024:.1f} KB)")
+            else:
+                await r2.write(r2_key, path.read_bytes())
+                print(f"  Uploaded {r2_key} ({size / 1024:.1f} KB)")
+
+        # Watermark files (e.g. silver/bcb_1/_watermark.json)
+        for wm_path in sorted(silver_dir.glob("*/_watermark.json")):
+            series_id = wm_path.parent.name
+            r2_key = f"silver/{series_id}/_watermark.json"
+            size = wm_path.stat().st_size
+            total_bytes += size
+            total_files += 1
+            if dry_run:
+                print(f"  [dry-run] Would upload {r2_key} ({size / 1024:.0f} B)")
+            else:
+                await r2.write(r2_key, wm_path.read_bytes())
+                print(f"  Uploaded {r2_key} ({size / 1024:.0f} B)")
+    else:
+        print("  WARNING: No silver directory found, skipping silver upload")
+
     action = "Would upload" if dry_run else "Uploaded"
-    print(f"  {action} {len(parquet_files)} files ({total_bytes / 1024:.1f} KB total)")
+    print(f"  {action} {total_files} files ({total_bytes / 1024:.1f} KB total)")
 
 
 # ── Step 5: Trigger API sync ─────────────────────────────────────────────
@@ -202,7 +237,7 @@ async def _async_main(args: argparse.Namespace) -> None:
         print("\n  Skipping R2 cleanup (--skip-r2-cleanup)")
 
     run_backfill(dry_run=args.dry_run)
-    await upload_gold_to_r2(dry_run=args.dry_run)
+    await upload_pipeline_to_r2(dry_run=args.dry_run)
     trigger_sync(dry_run=args.dry_run)
 
     print(f"\n{'='*60}")

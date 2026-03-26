@@ -86,8 +86,12 @@ def _(GOLD_SERIES, SILVER_SERIES, bucket, conn, mo, run_btn):
     for _series in GOLD_SERIES:
         _url = f"r2://{bucket}/gold/{_series}.parquet"
         try:
+            try:
+                conn.execute(f"DROP TABLE catalog.gold.{_series};")
+            except Exception:
+                pass
             conn.execute(f"""
-                CREATE OR REPLACE TABLE catalog.gold.{_series} AS
+                CREATE TABLE catalog.gold.{_series} AS
                 SELECT * FROM read_parquet('{_url}');
             """)
             _count = conn.execute(f"SELECT count(*) FROM catalog.gold.{_series}").fetchone()[0]
@@ -98,8 +102,12 @@ def _(GOLD_SERIES, SILVER_SERIES, bucket, conn, mo, run_btn):
     for _series in SILVER_SERIES:
         _url = f"r2://{bucket}/silver/{_series}.parquet"
         try:
+            try:
+                conn.execute(f"DROP TABLE catalog.silver.{_series};")
+            except Exception:
+                pass
             conn.execute(f"""
-                CREATE OR REPLACE TABLE catalog.silver.{_series} AS
+                CREATE TABLE catalog.silver.{_series} AS
                 SELECT * FROM read_parquet('{_url}');
             """)
             _count = conn.execute(f"SELECT count(*) FROM catalog.silver.{_series}").fetchone()[0]

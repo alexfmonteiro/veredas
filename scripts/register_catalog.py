@@ -7,7 +7,7 @@ Requires env vars:
     R2_CATALOG_TOKEN, R2_CATALOG_WAREHOUSE, R2_CATALOG_URI
     R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ACCOUNT_ID, R2_BUCKET_NAME
 
-Idempotent: uses CREATE OR REPLACE TABLE, safe to re-run.
+Idempotent: drops and recreates tables, safe to re-run.
 """
 
 from __future__ import annotations
@@ -103,8 +103,12 @@ def main() -> None:
         parquet_url = f"r2://{bucket}/gold/{series}.parquet"
         logger.info("registering_gold", series=series, url=parquet_url)
         try:
+            try:
+                conn.execute(f"DROP TABLE catalog.gold.{series};")
+            except Exception:
+                pass
             conn.execute(f"""
-                CREATE OR REPLACE TABLE catalog.gold.{series} AS
+                CREATE TABLE catalog.gold.{series} AS
                 SELECT * FROM read_parquet('{parquet_url}');
             """)
             row_count = conn.execute(
@@ -119,8 +123,12 @@ def main() -> None:
         parquet_url = f"r2://{bucket}/silver/{series}.parquet"
         logger.info("registering_silver", series=series, url=parquet_url)
         try:
+            try:
+                conn.execute(f"DROP TABLE catalog.silver.{series};")
+            except Exception:
+                pass
             conn.execute(f"""
-                CREATE OR REPLACE TABLE catalog.silver.{series} AS
+                CREATE TABLE catalog.silver.{series} AS
                 SELECT * FROM read_parquet('{parquet_url}');
             """)
             row_count = conn.execute(

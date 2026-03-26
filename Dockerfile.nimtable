@@ -1,0 +1,7 @@
+FROM ghcr.io/nimtable/nimtable:latest
+
+COPY nimtable-config.yaml /app/config-template.yaml
+COPY scripts/nimtable-entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+ENTRYPOINT ["sh", "/app/entrypoint.sh"]

@@ -32,18 +32,15 @@ def _discover_series() -> tuple[list[str], list[str]]:
     silver_series: list[str] = []
 
     for feed_id, feed in feeds.items():
-        # All active feeds produce silver
-        silver_series.append(feed_id)
-
-        # Feeds that are NOT raw parents (i.e., have no children using them
-        # as bronze_source, or are themselves leaf feeds) produce gold.
-        # In practice: all feeds produce gold except the raw tesouro feed
-        # which only produces silver (its derived feeds produce gold).
         has_children = any(
             f.bronze_source == feed_id for f in feeds.values()
         )
-        if not has_children:
-            gold_series.append(feed_id)
+        # Parent feeds (like tesouro) only produce bronze — no silver or gold
+        if has_children:
+            continue
+
+        silver_series.append(feed_id)
+        gold_series.append(feed_id)
 
     return sorted(gold_series), sorted(silver_series)
 
@@ -150,8 +147,9 @@ def main() -> None:
 
     logger.info("registration_complete", registered=registered, failed=failed)
 
-    tables = conn.execute("SHOW ALL TABLES;").df()
-    print("\n" + tables.to_string(index=False))
+    rows = conn.execute("SHOW ALL TABLES;").fetchall()
+    for row in rows:
+        logger.info("table", schema=row[1], name=row[2])
     conn.close()
 
 

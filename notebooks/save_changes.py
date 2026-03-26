@@ -22,19 +22,20 @@ def _(mo):
 @app.cell
 def _():
     import marimo as mo
+    import os
     import subprocess
-    return mo, subprocess
+    return mo, os, subprocess
 
 
 @app.cell
-def _(mo, subprocess):
+def _(mo, os, subprocess):
     _status = subprocess.run(
         ["git", "status", "--short", "notebooks/"],
-        capture_output=True, text=True, cwd="/app/repo",
+        capture_output=True, text=True, cwd=os.path.expanduser("~/repo"),
     )
     _diff = subprocess.run(
         ["git", "diff", "notebooks/"],
-        capture_output=True, text=True, cwd="/app/repo",
+        capture_output=True, text=True, cwd=os.path.expanduser("~/repo"),
     )
 
     has_changes = bool(_status.stdout.strip())
@@ -65,20 +66,20 @@ def _(has_changes, mo):
 
 
 @app.cell
-def _(commit_msg, mo, push_btn, subprocess):
+def _(commit_msg, mo, os, push_btn, subprocess):
     mo.stop(not push_btn.value)
 
     _add = subprocess.run(
         ["git", "add", "-A", "notebooks/"],
-        capture_output=True, text=True, cwd="/app/repo",
+        capture_output=True, text=True, cwd=os.path.expanduser("~/repo"),
     )
     _commit = subprocess.run(
         ["git", "commit", "-m", commit_msg.value],
-        capture_output=True, text=True, cwd="/app/repo",
+        capture_output=True, text=True, cwd=os.path.expanduser("~/repo"),
     )
     _push = subprocess.run(
         ["git", "push"],
-        capture_output=True, text=True, cwd="/app/repo",
+        capture_output=True, text=True, cwd=os.path.expanduser("~/repo"),
     )
 
     if _push.returncode == 0:

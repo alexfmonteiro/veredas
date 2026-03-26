@@ -43,7 +43,6 @@ def _(duckdb, os):
 
 @app.cell
 def _(conn, bucket):
-    # List available gold parquet files via filename column
     gold_files_df = conn.execute(f"""
         SELECT DISTINCT filename
         FROM read_parquet('r2://{bucket}/gold/*.parquet', filename=true)
@@ -67,20 +66,164 @@ def _(mo, series_list):
     return (series_picker,)
 
 
+# --- Overview ---
+
+
 @app.cell
 def _(conn, bucket, mo, series_picker):
-    if series_picker.value:
-        url = f"r2://{bucket}/gold/{series_picker.value}.parquet"
-        preview = conn.execute(f"""
-            SELECT * FROM read_parquet('{url}') ORDER BY date DESC LIMIT 50
-        """).df()
-        row_count = conn.execute(f"""
-            SELECT count(*) AS rows FROM read_parquet('{url}')
-        """).fetchone()[0]
+    mo.stop(not series_picker.value)
+    url = f"r2://{bucket}/gold/{series_picker.value}.parquet"
 
-        mo.md(f"**{series_picker.value}** — {row_count:,} rows total")
-        mo.ui.table(preview)
+    stats = conn.execute(f"""
+        SELECT
+            count(*) AS total_rows,
+            min(date) AS first_date,
+            max(date) AS last_date,
+            round(avg(value), 4) AS avg_value,
+            round(min(value), 4) AS min_value,
+            round(max(value), 4) AS max_value,
+            count(*) - count(value) AS null_count
+        FROM read_parquet('{url}')
+    """).df()
+
+    mo.md(f"## {series_picker.value}")
+    mo.ui.table(stats)
+    return (url,)
+
+
+# --- Latest values ---
+
+
+@app.cell
+def _(conn, mo, url):
+    mo.md("### Latest 30 Rows")
+
+    latest = conn.execute(f"""
+        SELECT date, value, unit, mom_delta, yoy_delta, rolling_12m_avg, z_score
+        FROM read_parquet('{url}')
+        ORDER BY date DESC
+        LIMIT 30
+    """).df()
+
+    mo.ui.table(latest)
     return
+
+
+# --- Time series chart ---
+
+
+@app.cell
+def _(conn, mo, series_picker, url):
+    mo.md("### Time Series")
+
+    chart_df = conn.execute(f"""
+        SELECT date, value
+        FROM read_parquet('{url}')
+        WHERE value IS NOT NULL
+        ORDER BY date
+    """).df()
+
+    mo.ui.altair_chart(
+        _make_line_chart(chart_df, series_picker.value)
+    )
+    return
+
+
+@app.cell
+def _():
+    import altair as alt
+
+    def _make_line_chart(df, title):
+        return (
+            alt.Chart(df)
+            .mark_line(strokeWidth=1.5)
+            .encode(
+                x=alt.X("date:T", title="Date"),
+                y=alt.Y("value:Q", title="Value"),
+                tooltip=["date:T", "value:Q"],
+            )
+            .properties(width="container", height=300, title=title)
+        )
+
+    return (_make_line_chart,)
+
+
+# --- Z-score anomalies ---
+
+
+@app.cell
+def _(conn, mo, url):
+    mo.md("### Z-Score Anomalies (|z| > 2)")
+
+    anomalies = conn.execute(f"""
+        SELECT date, value, round(z_score, 3) AS z_score, mom_delta, yoy_delta
+        FROM read_parquet('{url}')
+        WHERE abs(z_score) > 2
+        ORDER BY date DESC
+        LIMIT 20
+    """).df()
+
+    if len(anomalies) == 0:
+        mo.md("_No anomalies found._")
+    else:
+        mo.ui.table(anomalies)
+    return
+
+
+# --- Month-over-month changes ---
+
+
+@app.cell
+def _(conn, mo, url):
+    mo.md("### Largest Month-over-Month Changes")
+
+    big_moves = conn.execute(f"""
+        SELECT date, value, round(mom_delta, 4) AS mom_delta
+        FROM read_parquet('{url}')
+        WHERE mom_delta IS NOT NULL
+        ORDER BY abs(mom_delta) DESC
+        LIMIT 15
+    """).df()
+
+    mo.ui.table(big_moves)
+    return
+
+
+# --- Year-over-year comparison ---
+
+
+@app.cell
+def _(conn, mo, url):
+    mo.md("### Year-over-Year Comparison (Latest 24 Observations)")
+
+    yoy = conn.execute(f"""
+        SELECT date, value, round(yoy_delta, 4) AS yoy_delta, round(rolling_12m_avg, 4) AS rolling_12m_avg
+        FROM read_parquet('{url}')
+        WHERE yoy_delta IS NOT NULL
+        ORDER BY date DESC
+        LIMIT 24
+    """).df()
+
+    mo.ui.table(yoy)
+    return
+
+
+# --- Schema ---
+
+
+@app.cell
+def _(conn, mo, url):
+    mo.md("### Schema")
+
+    schema = conn.execute(f"""
+        DESCRIBE SELECT * FROM read_parquet('{url}')
+    """).df()
+
+    mo.ui.table(schema)
+    return
+
+
+# --- Ad-hoc SQL ---
 
 
 @app.cell

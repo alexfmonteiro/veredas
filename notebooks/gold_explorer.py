@@ -10,8 +10,8 @@ def _(mo):
         """
         # Gold Layer Explorer
 
-        Query the gold (analytical) layer directly from R2 via DuckDB.
-        Pick a series or write your own SQL.
+        Query the gold (analytical) layer via the Iceberg catalog or
+        directly from R2 parquet. Pick a series or write your own SQL.
         """
     )
     return
@@ -28,35 +28,69 @@ def _():
 @app.cell
 def _(duckdb, os):
     conn = duckdb.connect()
+    conn.execute("INSTALL iceberg; LOAD iceberg;")
     conn.execute("INSTALL httpfs; LOAD httpfs;")
-    conn.execute(f"""
-        CREATE SECRET r2_secret (
-            TYPE R2,
-            KEY_ID '{os.environ.get("R2_ACCESS_KEY_ID", "")}',
-            SECRET '{os.environ.get("R2_SECRET_ACCESS_KEY", "")}',
-            ACCOUNT_ID '{os.environ.get("R2_ACCOUNT_ID", "")}'
-        );
-    """)
+
     bucket = os.environ.get("R2_BUCKET_NAME", "br-economic-pulse-data")
-    return bucket, conn
+
+    # R2 storage secret (for raw parquet fallback)
+    key_id = os.environ.get("R2_ACCESS_KEY_ID", "")
+    secret = os.environ.get("R2_SECRET_ACCESS_KEY", "")
+    account_id = os.environ.get("R2_ACCOUNT_ID", "")
+    if key_id and secret:
+        conn.execute(f"""
+            CREATE SECRET r2_storage (
+                TYPE R2, KEY_ID '{key_id}',
+                SECRET '{secret}', ACCOUNT_ID '{account_id}'
+            );
+        """)
+
+    # Try attaching Iceberg catalog
+    token = os.environ.get("R2_CATALOG_TOKEN", "")
+    warehouse = os.environ.get("R2_CATALOG_WAREHOUSE", "")
+    catalog_uri = os.environ.get("R2_CATALOG_URI", "")
+    use_catalog = False
+
+    if all([token, warehouse, catalog_uri]):
+        try:
+            conn.execute(f"CREATE SECRET (TYPE ICEBERG, TOKEN '{token}');")
+            conn.execute(f"""
+                ATTACH '{warehouse}' AS catalog (
+                    TYPE ICEBERG, ENDPOINT '{catalog_uri}'
+                );
+            """)
+            use_catalog = True
+        except Exception:
+            pass
+
+    return bucket, conn, use_catalog
 
 
 @app.cell
-def _(conn, bucket):
-    gold_files_df = conn.execute(f"""
-        SELECT DISTINCT filename
-        FROM read_parquet('r2://{bucket}/gold/*.parquet', filename=true)
-    """).df()
-
-    series_list = sorted(
-        f.split("/")[-1].replace(".parquet", "")
-        for f in gold_files_df["filename"].tolist()
-    )
+def _(bucket, conn, use_catalog):
+    if use_catalog:
+        tables_df = conn.execute("""
+            SELECT name FROM (SHOW ALL TABLES)
+            WHERE schema = 'gold'
+        """).df()
+        series_list = sorted(tables_df["name"].tolist())
+    else:
+        gold_files_df = conn.execute(f"""
+            SELECT DISTINCT filename
+            FROM read_parquet('r2://{bucket}/gold/*.parquet', filename=true)
+        """).df()
+        series_list = sorted(
+            f.split("/")[-1].replace(".parquet", "")
+            for f in gold_files_df["filename"].tolist()
+        )
     return (series_list,)
 
 
 @app.cell
-def _(mo, series_list):
+def _(mo, series_list, use_catalog):
+    mode = "Iceberg catalog" if use_catalog else "raw parquet"
+    mo.md(f"_Source: {mode}_")
+
     series_picker = mo.ui.dropdown(
         options=series_list,
         value=series_list[0] if series_list else None,
@@ -66,13 +100,23 @@ def _(mo, series_list):
     return (series_picker,)
 
 
+@app.cell
+def _(bucket, series_picker, use_catalog):
+    # Build the table reference used by all downstream cells
+    sid = series_picker.value
+    if use_catalog:
+        tbl_ref = f"catalog.gold.{sid}" if sid else ""
+    else:
+        tbl_ref = f"read_parquet('r2://{bucket}/gold/{sid}.parquet')" if sid else ""
+    return (tbl_ref,)
+
+
 # --- Overview ---
 
 
 @app.cell
-def _(conn, bucket, mo, series_picker):
+def _(conn, mo, series_picker, tbl_ref):
     mo.stop(not series_picker.value)
-    url = f"r2://{bucket}/gold/{series_picker.value}.parquet"
 
     stats = conn.execute(f"""
         SELECT
@@ -83,24 +127,24 @@ def _(conn, bucket, mo, series_picker):
             round(min(value), 4) AS min_value,
             round(max(value), 4) AS max_value,
             count(*) - count(value) AS null_count
-        FROM read_parquet('{url}')
+        FROM {tbl_ref}
     """).df()
 
     mo.md(f"## {series_picker.value}")
     mo.ui.table(stats)
-    return (url,)
+    return
 
 
 # --- Latest values ---
 
 
 @app.cell
-def _(conn, mo, url):
+def _(conn, mo, tbl_ref):
     mo.md("### Latest 30 Rows")
 
     latest = conn.execute(f"""
         SELECT date, value, unit, mom_delta, yoy_delta, rolling_12m_avg, z_score
-        FROM read_parquet('{url}')
+        FROM {tbl_ref}
         ORDER BY date DESC
         LIMIT 30
     """).df()
@@ -113,12 +157,12 @@ def _(conn, mo, url):
 
 
 @app.cell
-def _(conn, mo, series_picker, url):
+def _(conn, mo, series_picker, tbl_ref):
     mo.md("### Time Series")
 
     chart_df = conn.execute(f"""
         SELECT date, value
-        FROM read_parquet('{url}')
+        FROM {tbl_ref}
         WHERE value IS NOT NULL
         ORDER BY date
     """).df()
@@ -152,12 +196,12 @@ def _():
 
 
 @app.cell
-def _(conn, mo, url):
+def _(conn, mo, tbl_ref):
     mo.md("### Z-Score Anomalies (|z| > 2)")
 
     anomalies = conn.execute(f"""
         SELECT date, value, round(z_score, 3) AS z_score, mom_delta, yoy_delta
-        FROM read_parquet('{url}')
+        FROM {tbl_ref}
         WHERE abs(z_score) > 2
         ORDER BY date DESC
         LIMIT 20
@@ -174,12 +218,12 @@ def _(conn, mo, url):
 
 
 @app.cell
-def _(conn, mo, url):
+def _(conn, mo, tbl_ref):
     mo.md("### Largest Month-over-Month Changes")
 
     big_moves = conn.execute(f"""
         SELECT date, value, round(mom_delta, 4) AS mom_delta
-        FROM read_parquet('{url}')
+        FROM {tbl_ref}
         WHERE mom_delta IS NOT NULL
         ORDER BY abs(mom_delta) DESC
         LIMIT 15
@@ -193,12 +237,13 @@ def _(conn, mo, url):
 
 
 @app.cell
-def _(conn, mo, url):
+def _(conn, mo, tbl_ref):
     mo.md("### Year-over-Year Comparison (Latest 24 Observations)")
 
     yoy = conn.execute(f"""
-        SELECT date, value, round(yoy_delta, 4) AS yoy_delta, round(rolling_12m_avg, 4) AS rolling_12m_avg
-        FROM read_parquet('{url}')
+        SELECT date, value, round(yoy_delta, 4) AS yoy_delta,
+               round(rolling_12m_avg, 4) AS rolling_12m_avg
+        FROM {tbl_ref}
         WHERE yoy_delta IS NOT NULL
         ORDER BY date DESC
         LIMIT 24
@@ -212,13 +257,10 @@ def _(conn, mo, url):
 
 
 @app.cell
-def _(conn, mo, url):
+def _(conn, mo, tbl_ref):
     mo.md("### Schema")
 
-    schema = conn.execute(f"""
-        DESCRIBE SELECT * FROM read_parquet('{url}')
-    """).df()
-
+    schema = conn.execute(f"DESCRIBE SELECT * FROM {tbl_ref}").df()
     mo.ui.table(schema)
     return
 
@@ -235,7 +277,7 @@ def _(mo):
 @app.cell
 def _(mo):
     sql_input = mo.ui.text_area(
-        value="SELECT * FROM read_parquet('r2://br-economic-pulse-data/gold/bcb_432.parquet')\nORDER BY date DESC\nLIMIT 20",
+        value="SELECT * FROM catalog.gold.bcb_432\nORDER BY date DESC\nLIMIT 20",
         label="DuckDB SQL",
         full_width=True,
     )

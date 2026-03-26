@@ -11,7 +11,8 @@ echo "Cloning repository..."
 git clone --depth 1 "$REPO_URL" "$CLONE_DIR"
 
 echo "Starting marimo..."
-exec marimo edit "$CLONE_DIR/notebooks/" \
+cd "$CLONE_DIR/notebooks"
+exec marimo edit . \
   --host 0.0.0.0 \
   -p "${PORT:-8080}" \
   --token \

@@ -1,0 +1,12 @@
+[tool.marimo]
+
+[tool.marimo.save]
+autosave = "after_delay"
+autosave_delay = 1000
+format_on_save = true
+
+[tool.marimo.display]
+theme = "dark"
+
+[tool.marimo.runtime]
+auto_instantiate = true

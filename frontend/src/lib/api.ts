@@ -163,9 +163,9 @@ export interface SyncStatusResponse {
 // --- Series label helper ---
 
 const SERIES_LABELS: Record<string, string> = {
-  bcb_432: 'SELIC',
-  bcb_433: 'IPCA',
-  bcb_1: 'USD/BRL',
+  bcb_selic: 'SELIC',
+  bcb_ipca: 'IPCA',
+  bcb_usd_brl: 'USD/BRL',
   ibge_pnad: 'Taxa de Desemprego',
   ibge_gdp: 'PIB',
   tesouro_prefixado_curto: 'Prefixado Curto',
@@ -262,9 +262,9 @@ export interface RunHistoryResponse {
 }
 
 export const SERIES: SeriesConfig[] = [
-  { id: 'bcb_432', label: 'SELIC', unit: '% a.a.', source: 'BCB', color: '#3b82f6', freshnessHours: 72 },
-  { id: 'bcb_433', label: 'IPCA', unit: '% a.m.', source: 'BCB', color: '#8b5cf6', freshnessHours: 1080 },
-  { id: 'bcb_1', label: 'USD/BRL', unit: 'R$', source: 'BCB', color: '#22c55e', freshnessHours: 72 },
+  { id: 'bcb_selic', label: 'SELIC', unit: '% a.a.', source: 'BCB', color: '#3b82f6', freshnessHours: 72 },
+  { id: 'bcb_ipca', label: 'IPCA', unit: '% a.m.', source: 'BCB', color: '#8b5cf6', freshnessHours: 1080 },
+  { id: 'bcb_usd_brl', label: 'USD/BRL', unit: 'R$', source: 'BCB', color: '#22c55e', freshnessHours: 72 },
   { id: 'ibge_pnad', label: 'Taxa de Desemprego', unit: '%', source: 'IBGE', color: '#f59e0b', freshnessHours: 2400 },
   { id: 'ibge_gdp', label: 'PIB', unit: 'R$ bi', source: 'IBGE', color: '#06b6d4', freshnessHours: 1080 },
   { id: 'tesouro_prefixado_curto', label: 'Prefixado Curto', unit: '% a.a.', source: 'Tesouro', color: '#ec4899', freshnessHours: 72 },

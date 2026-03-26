@@ -109,9 +109,9 @@ def main() -> int:
 
     total_rows = 0
     series_map = {
-        "bcb_432": "bcb_selic.json",
-        "bcb_433": "bcb_ipca.json",
-        "bcb_1": "bcb_usd_brl.json",
+        "bcb_selic": "bcb_selic.json",
+        "bcb_ipca": "bcb_ipca.json",
+        "bcb_usd_brl": "bcb_usd_brl.json",
     }
 
     files_count = 0

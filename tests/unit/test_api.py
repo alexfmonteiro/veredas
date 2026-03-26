@@ -27,13 +27,13 @@ def env_vars(tmp_path: Path) -> None:  # type: ignore[misc]
     table = pa.table({
         "date": dates,
         "value": [14.75, 14.75, 14.75],
-        "series": ["bcb_432", "bcb_432", "bcb_432"],
+        "series": ["bcb_selic", "bcb_selic", "bcb_selic"],
         "mom_delta": [None, 0.0, 0.0],
         "yoy_delta": [None, None, None],
         "rolling_12m_avg": [14.75, 14.75, 14.75],
         "z_score": [None, None, None],
     })
-    pq.write_table(table, gold_dir / "bcb_432.parquet")
+    pq.write_table(table, gold_dir / "bcb_selic.parquet")
 
     # Write metadata
     metadata = {
@@ -70,10 +70,10 @@ async def test_health_endpoint() -> None:
 async def test_metrics_endpoint() -> None:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.get("/api/metrics/bcb_432")
+        resp = await client.get("/api/metrics/bcb_selic")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["series"] == "bcb_432"
+    assert data["series"] == "bcb_selic"
     assert len(data["data_points"]) > 0
 
 
@@ -109,7 +109,7 @@ async def test_quality_latest_with_report(tmp_path: Path) -> None:
         "timestamp": "2026-03-22T06:05:00+00:00",
         "overall_status": "passed",
         "checks": [
-            {"check_name": "null_rate_bcb_432", "passed": True, "metric_value": 0.0, "threshold": 0.02, "message": ""}
+            {"check_name": "null_rate_bcb_selic", "passed": True, "metric_value": 0.0, "threshold": 0.02, "message": ""}
         ],
         "series_freshness": [],
         "critical_failures": [],
@@ -265,10 +265,10 @@ async def test_quality_latest_series_freshness() -> None:
     freshness = data["series_freshness"]
     assert isinstance(freshness, list)
     assert len(freshness) == 8  # 8 tracked series
-    # bcb_432 has gold data in fixture; the rest should be CRITICAL (no data)
-    bcb_432 = next(f for f in freshness if f["series"] == "bcb_432")
-    assert bcb_432["status"] in ("fresh", "stale", "critical")
-    assert bcb_432["hours_since_update"] is not None
+    # bcb_selic has gold data in fixture; the rest should be CRITICAL (no data)
+    bcb_selic = next(f for f in freshness if f["series"] == "bcb_selic")
+    assert bcb_selic["status"] in ("fresh", "stale", "critical")
+    assert bcb_selic["hours_since_update"] is not None
     # Series without data should be CRITICAL
     ibge_pnad = next(f for f in freshness if f["series"] == "ibge_pnad")
     assert ibge_pnad["status"] == "critical"

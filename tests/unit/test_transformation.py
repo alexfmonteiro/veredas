@@ -82,13 +82,13 @@ BCB_SAMPLE_DATA = [
 @pytest.fixture()
 def bronze_data(tmp_path: Path) -> Path:
     """Populate bronze layer with sample BCB data."""
-    _write_bronze_parquet(tmp_path, "bcb_432", BCB_SAMPLE_DATA)
-    _write_bronze_parquet(tmp_path, "bcb_433", [
+    _write_bronze_parquet(tmp_path, "bcb_selic", BCB_SAMPLE_DATA)
+    _write_bronze_parquet(tmp_path, "bcb_ipca", [
         {"data": "01/01/2025", "valor": "0.16"},
         {"data": "01/02/2025", "valor": "1.31"},
         {"data": "01/03/2025", "valor": "0.56"},
     ])
-    _write_bronze_parquet(tmp_path, "bcb_1", [
+    _write_bronze_parquet(tmp_path, "bcb_usd_brl", [
         {"data": "01/01/2025", "valor": "6.1800"},
         {"data": "01/02/2025", "valor": "5.7600"},
         {"data": "01/03/2025", "valor": "5.7300"},
@@ -173,9 +173,9 @@ async def test_transformation_canonical_silver(
     await task.run()
 
     # Check that silver is written as silver/{series}.parquet
-    assert await storage.exists("silver/bcb_432.parquet")
-    assert await storage.exists("silver/bcb_433.parquet")
-    assert await storage.exists("silver/bcb_1.parquet")
+    assert await storage.exists("silver/bcb_selic.parquet")
+    assert await storage.exists("silver/bcb_ipca.parquet")
+    assert await storage.exists("silver/bcb_usd_brl.parquet")
 
 
 @pytest.mark.asyncio()
@@ -184,10 +184,10 @@ async def test_transformation_watermark(
     feed_configs: dict[str, FeedConfig],
 ) -> None:
     """Watermark should track last processed bronze file."""
-    bcb_config = {"bcb_432": feed_configs["bcb_432"]}
+    bcb_config = {"bcb_selic": feed_configs["bcb_selic"]}
 
     # Write first bronze batch
-    _write_bronze_parquet(tmp_path, "bcb_432", [
+    _write_bronze_parquet(tmp_path, "bcb_selic", [
         {"data": "01/01/2025", "valor": "13.25"},
         {"data": "01/02/2025", "valor": "13.25"},
     ], filename="20260323_060000_000000.parquet")
@@ -197,12 +197,12 @@ async def test_transformation_watermark(
     await task.run()
 
     # Watermark should exist
-    assert await storage.exists("silver/bcb_432/_watermark.json")
-    wm_data = json.loads(await storage.read("silver/bcb_432/_watermark.json"))
+    assert await storage.exists("silver/bcb_selic/_watermark.json")
+    wm_data = json.loads(await storage.read("silver/bcb_selic/_watermark.json"))
     assert "last_processed_key" in wm_data
 
     # Write second bronze batch
-    _write_bronze_parquet(tmp_path, "bcb_432", [
+    _write_bronze_parquet(tmp_path, "bcb_selic", [
         {"data": "01/03/2025", "valor": "13.75"},
     ], filename="20260324_060000_000000.parquet")
 
@@ -210,7 +210,7 @@ async def test_transformation_watermark(
     await task.run()
 
     # Silver should contain all 3 rows (merged)
-    silver_data = await storage.read("silver/bcb_432.parquet")
+    silver_data = await storage.read("silver/bcb_selic.parquet")
     table = pq.read_table(io.BytesIO(silver_data))
     assert table.num_rows == 3
 
@@ -225,7 +225,7 @@ async def test_transformation_silver_has_unit(
     task = TransformationTask(storage=storage, feed_configs=bcb_configs)
     await task.run()
 
-    silver_data = await storage.read("silver/bcb_432.parquet")
+    silver_data = await storage.read("silver/bcb_selic.parquet")
     table = pq.read_table(io.BytesIO(silver_data))
 
     assert "unit" in table.column_names
@@ -243,7 +243,7 @@ async def test_transformation_silver_metadata_columns(
     task = TransformationTask(storage=storage, feed_configs=bcb_configs)
     await task.run()
 
-    silver_data = await storage.read("silver/bcb_432.parquet")
+    silver_data = await storage.read("silver/bcb_selic.parquet")
     table = pq.read_table(io.BytesIO(silver_data))
 
     assert "_cleaned_at" in table.column_names
@@ -256,15 +256,15 @@ async def test_transformation_latest_only_dedup(
     feed_configs: dict[str, FeedConfig],
 ) -> None:
     """latest_only should keep only the most recent row per date."""
-    bcb_config = {"bcb_432": feed_configs["bcb_432"]}
+    bcb_config = {"bcb_selic": feed_configs["bcb_selic"]}
 
     # Write two bronze files with overlapping dates but different values
-    _write_bronze_parquet(tmp_path, "bcb_432", [
+    _write_bronze_parquet(tmp_path, "bcb_selic", [
         {"data": "01/01/2025", "valor": "13.00"},
         {"data": "01/02/2025", "valor": "13.25"},
     ], filename="20260323_060000_000000.parquet")
 
-    _write_bronze_parquet(tmp_path, "bcb_432", [
+    _write_bronze_parquet(tmp_path, "bcb_selic", [
         {"data": "01/01/2025", "valor": "13.50"},  # Updated value
         {"data": "01/03/2025", "valor": "14.00"},
     ], filename="20260324_060000_000000.parquet")
@@ -273,7 +273,7 @@ async def test_transformation_latest_only_dedup(
     task = TransformationTask(storage=storage, feed_configs=bcb_config)
     await task.run()
 
-    silver_data = await storage.read("silver/bcb_432.parquet")
+    silver_data = await storage.read("silver/bcb_selic.parquet")
     table = pq.read_table(io.BytesIO(silver_data))
 
     # Should have 3 unique dates, not 4

@@ -159,7 +159,7 @@ User question → Router → Query Planner → SQL generation → DuckDB → Res
 ```python
 @dataclass
 class QueryIntent:
-    metrics: list[str]          # ["bcb_432", "bcb_433"]
+    metrics: list[str]          # ["bcb_selic", "bcb_ipca"]
     time_range: TimeRange       # last_6_months, ytd, custom(start, end)
     aggregation: Aggregation    # latest, trend, comparison, distribution
     explanation_needed: bool    # True only when reasoning required

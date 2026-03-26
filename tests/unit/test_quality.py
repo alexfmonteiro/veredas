@@ -63,7 +63,7 @@ def _write_bronze_with_metadata(
 def good_bronze_data(tmp_path: Path) -> Path:
     """Bronze data that passes all quality checks."""
     _write_bronze_with_metadata(
-        tmp_path, "bcb_432",
+        tmp_path, "bcb_selic",
         ["01/01/2026", "01/02/2026", "01/03/2026"],
         ["14.75", "14.75", "14.75"],
     )
@@ -74,10 +74,10 @@ def good_bronze_data(tmp_path: Path) -> Path:
 def good_gold_data(tmp_path: Path) -> Path:
     """Gold data that passes all quality checks."""
     dates = [dt.datetime(2026, 1, 1), dt.datetime(2026, 2, 1), dt.datetime(2026, 3, 1)]
-    _write_parquet(tmp_path, "gold/bcb_432.parquet", {
+    _write_parquet(tmp_path, "gold/bcb_selic.parquet", {
         "date": dates,
         "value": [14.75, 14.75, 14.75],
-        "series": ["bcb_432", "bcb_432", "bcb_432"],
+        "series": ["bcb_selic", "bcb_selic", "bcb_selic"],
         "unit": ["% a.a.", "% a.a.", "% a.a."],
         "last_updated_at": ["2026-01-01T00:00:00"] * 3,
         "calculation_version": ["1.0.0"] * 3,
@@ -149,7 +149,7 @@ async def test_quality_report_format(good_bronze_data: Path) -> None:
 async def test_quality_high_null_rate(tmp_path: Path) -> None:
     """Quality should flag high null rates."""
     _write_bronze_with_metadata(
-        tmp_path, "bcb_432",
+        tmp_path, "bcb_selic",
         ["01/01/2026", None, None, None, None],
         ["14.75", None, None, None, None],
     )
@@ -176,7 +176,7 @@ async def test_quality_health_check(tmp_path: Path) -> None:
 async def test_quality_rescued_data_rate(tmp_path: Path) -> None:
     """Quality should check rescued data rate when feed config provides threshold."""
     _write_bronze_with_metadata(
-        tmp_path, "bcb_432",
+        tmp_path, "bcb_selic",
         ["01/01/2026", "01/02/2026", "01/03/2026", "01/04/2026"],
         ["14.75", "14.75", "14.75", "14.75"],
         # 50% rescued data rate
@@ -205,7 +205,7 @@ async def test_quality_uses_feed_config_thresholds(tmp_path: Path) -> None:
     """Quality should use thresholds from feed config, not hardcoded defaults."""
     # Write bronze with 40% null rate on 'valor'
     _write_bronze_with_metadata(
-        tmp_path, "bcb_432",
+        tmp_path, "bcb_selic",
         ["01/01/2026", "01/02/2026", "01/03/2026", "01/04/2026", "01/05/2026"],
         ["14.75", "14.75", "14.75", None, None],
     )
@@ -218,7 +218,7 @@ async def test_quality_uses_feed_config_thresholds(tmp_path: Path) -> None:
     keys = await storage.list_keys("quality")
     report_data = await storage.read(sorted(keys)[-1])
     report = json.loads(report_data)
-    valor_null = [c for c in report["checks"] if c["check_name"] == "null_rate_bcb_432_valor"]
+    valor_null = [c for c in report["checks"] if c["check_name"] == "null_rate_bcb_selic_valor"]
     assert len(valor_null) == 1
     assert not valor_null[0]["passed"]  # 40% > 2%
 
@@ -227,10 +227,10 @@ async def test_quality_uses_feed_config_thresholds(tmp_path: Path) -> None:
 async def test_quality_gold_value_range(tmp_path: Path) -> None:
     """Quality should check value range when configured in feed config."""
     dates = [dt.datetime(2026, 1, 1), dt.datetime(2026, 2, 1)]
-    _write_parquet(tmp_path, "gold/bcb_432.parquet", {
+    _write_parquet(tmp_path, "gold/bcb_selic.parquet", {
         "date": dates,
         "value": [14.75, 999.99],  # 999.99 is out of range [0, 50]
-        "series": ["bcb_432", "bcb_432"],
+        "series": ["bcb_selic", "bcb_selic"],
         "unit": ["% a.a.", "% a.a."],
         "last_updated_at": ["2026-01-01T00:00:00"] * 2,
         "calculation_version": ["1.0.0"] * 2,

@@ -30,27 +30,27 @@ class TestQuerySkillRouter:
     def test_selic_en_routes_to_direct_lookup(self) -> None:
         tier, metric = self.router.route("What is the current SELIC rate?")
         assert tier == QueryTier.DIRECT_LOOKUP
-        assert metric == "bcb_432"
+        assert metric == "bcb_selic"
 
     def test_selic_pt_routes_to_direct_lookup(self) -> None:
         tier, metric = self.router.route("Qual o valor atual da SELIC?")
         assert tier == QueryTier.DIRECT_LOOKUP
-        assert metric == "bcb_432"
+        assert metric == "bcb_selic"
 
     def test_ipca_routes_to_direct_lookup(self) -> None:
         tier, metric = self.router.route("What is the current IPCA?")
         assert tier == QueryTier.DIRECT_LOOKUP
-        assert metric == "bcb_433"
+        assert metric == "bcb_ipca"
 
     def test_dolar_routes_to_direct_lookup(self) -> None:
         tier, metric = self.router.route("Qual o valor atual do dolar?")
         assert tier == QueryTier.DIRECT_LOOKUP
-        assert metric == "bcb_1"
+        assert metric == "bcb_usd_brl"
 
     def test_usd_routes_to_direct_lookup(self) -> None:
         tier, metric = self.router.route("What is the current USD exchange rate?")
         assert tier == QueryTier.DIRECT_LOOKUP
-        assert metric == "bcb_1"
+        assert metric == "bcb_usd_brl"
 
     def test_desemprego_routes_to_direct_lookup(self) -> None:
         tier, metric = self.router.route("Qual a taxa atual de desemprego?")
@@ -111,7 +111,7 @@ class TestQuerySkillRouter:
     def test_case_insensitive_routing(self) -> None:
         tier, metric = self.router.route("WHAT IS THE CURRENT SELIC RATE?")
         assert tier == QueryTier.DIRECT_LOOKUP
-        assert metric == "bcb_432"
+        assert metric == "bcb_selic"
 
 
 # ---------------------------------------------------------------------------
@@ -163,10 +163,10 @@ class TestQueryAgentDirectLookup:
     @pytest.mark.asyncio
     async def test_direct_lookup_success(self) -> None:
         """Simple SELIC question returns DIRECT_LOOKUP with zero tokens."""
-        gold_rows = _make_gold_rows("bcb_432", count=3)
+        gold_rows = _make_gold_rows("bcb_selic", count=3)
 
         async def mock_query_gold(series: str, after: str | None = None) -> list[dict[str, Any]]:
-            if series == "bcb_432":
+            if series == "bcb_selic":
                 return gold_rows
             return []
 

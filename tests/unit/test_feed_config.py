@@ -252,9 +252,9 @@ class TestFeedConfigLoader:
         """Verify the actual data/feeds/ YAML files load correctly."""
         configs = load_feed_configs("data/feeds")
         assert len(configs) == 9
-        assert "bcb_432" in configs
-        assert "bcb_433" in configs
-        assert "bcb_1" in configs
+        assert "bcb_selic" in configs
+        assert "bcb_ipca" in configs
+        assert "bcb_usd_brl" in configs
         assert "ibge_pnad" in configs
         assert "ibge_gdp" in configs
         assert "tesouro" in configs
@@ -280,7 +280,7 @@ class TestFeedConfigLoader:
     def test_bcb_backfill_fields(self) -> None:
         """BCB feeds should have backfill configuration."""
         configs = load_feed_configs("data/feeds")
-        for feed_id in ("bcb_432", "bcb_433", "bcb_1"):
+        for feed_id in ("bcb_selic", "bcb_ipca", "bcb_usd_brl"):
             feed = configs[feed_id]
             assert feed.source.backfill_url is not None
             assert feed.source.backfill_window_years == 10

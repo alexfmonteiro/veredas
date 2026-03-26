@@ -43,13 +43,13 @@ DIRECT_LOOKUP_PATTERNS: dict[re.Pattern[str], str] = {
 # ---------------------------------------------------------------------------
 
 METRIC_KEYWORDS: dict[str, str] = {
-    "selic": "bcb_432",
-    "ipca": "bcb_433",
-    "dolar": "bcb_1",
-    "dollar": "bcb_1",
-    "usd": "bcb_1",
-    "cambio": "bcb_1",
-    "câmbio": "bcb_1",
+    "selic": "bcb_selic",
+    "ipca": "bcb_ipca",
+    "dolar": "bcb_usd_brl",
+    "dollar": "bcb_usd_brl",
+    "usd": "bcb_usd_brl",
+    "cambio": "bcb_usd_brl",
+    "câmbio": "bcb_usd_brl",
     "desemprego": "ibge_pnad",
     "unemployment": "ibge_pnad",
     "pib": "ibge_gdp",

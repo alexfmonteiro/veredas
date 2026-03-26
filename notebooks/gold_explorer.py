@@ -277,7 +277,7 @@ def _(mo):
 @app.cell
 def _(mo):
     sql_input = mo.ui.text_area(
-        value="SELECT * FROM catalog.gold.bcb_432\nORDER BY date DESC\nLIMIT 20",
+        value="SELECT * FROM catalog.gold.bcb_selic\nORDER BY date DESC\nLIMIT 20",
         label="DuckDB SQL",
         full_width=True,
     )

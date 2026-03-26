@@ -50,7 +50,7 @@ def feed_configs() -> dict[str, FeedConfig]:
 @pytest.fixture()
 def bcb_only_configs(feed_configs: dict[str, FeedConfig]) -> dict[str, FeedConfig]:
     """Just BCB SELIC for focused tests."""
-    return {"bcb_432": feed_configs["bcb_432"]}
+    return {"bcb_selic": feed_configs["bcb_selic"]}
 
 
 @pytest.fixture()
@@ -107,11 +107,11 @@ def _make_mock_client(
     """Create a mock HTTP client that routes by URL matching feed configs."""
     url_map: dict[str, MagicMock] = {}
     for feed_id, feed in feed_configs.items():
-        if feed_id == "bcb_432" and bcb_selic_data is not None:
+        if feed_id == "bcb_selic" and bcb_selic_data is not None:
             url_map[feed.source.url] = _make_response(json_data=bcb_selic_data)
-        elif feed_id == "bcb_433" and bcb_ipca_data is not None:
+        elif feed_id == "bcb_ipca" and bcb_ipca_data is not None:
             url_map[feed.source.url] = _make_response(json_data=bcb_ipca_data)
-        elif feed_id == "bcb_1" and bcb_usd_brl_data is not None:
+        elif feed_id == "bcb_usd_brl" and bcb_usd_brl_data is not None:
             url_map[feed.source.url] = _make_response(json_data=bcb_usd_brl_data)
         elif feed_id == "ibge_pnad" and ibge_data is not None:
             url_map[feed.source.url] = _make_response(json_data=ibge_data)
@@ -164,9 +164,9 @@ async def test_ingestion_task_success(
     keys = await storage.list_keys("bronze")
     assert len(keys) > 0
     key_str = " ".join(keys)
-    assert "bcb_432" in key_str
-    assert "bcb_433" in key_str
-    assert "bcb_1" in key_str
+    assert "bcb_selic" in key_str
+    assert "bcb_ipca" in key_str
+    assert "bcb_usd_brl" in key_str
 
 
 @pytest.mark.asyncio()
@@ -239,7 +239,7 @@ async def test_ingestion_metadata_columns(
     )
     await task.run()
 
-    keys = await storage.list_keys("bronze/bcb_432")
+    keys = await storage.list_keys("bronze/bcb_selic")
     data = await storage.read(sorted(keys)[-1])
     table = pq.read_table(io.BytesIO(data))
 
@@ -251,7 +251,7 @@ async def test_ingestion_metadata_columns(
 
     # Verify metadata values
     sources = table.column("_source").to_pylist()
-    assert all(s == "bcb_432" for s in sources)
+    assert all(s == "bcb_selic" for s in sources)
     run_ids = table.column("_run_id").to_pylist()
     assert all(r == "test-meta-001" for r in run_ids)
 
@@ -270,7 +270,7 @@ async def test_ingestion_rescued_data_null_when_clean(
     )
     await task.run()
 
-    keys = await storage.list_keys("bronze/bcb_432")
+    keys = await storage.list_keys("bronze/bcb_selic")
     data = await storage.read(sorted(keys)[-1])
     table = pq.read_table(io.BytesIO(data))
 
@@ -294,7 +294,7 @@ async def test_ingestion_rescued_data_captures_extra_fields(
     )
     await task.run()
 
-    keys = await storage.list_keys("bronze/bcb_432")
+    keys = await storage.list_keys("bronze/bcb_selic")
     data = await storage.read(sorted(keys)[-1])
     table = pq.read_table(io.BytesIO(data))
 
@@ -319,7 +319,7 @@ async def test_ingestion_all_fields_as_strings(
     )
     await task.run()
 
-    keys = await storage.list_keys("bronze/bcb_432")
+    keys = await storage.list_keys("bronze/bcb_selic")
     data = await storage.read(sorted(keys)[-1])
     table = pq.read_table(io.BytesIO(data))
 
@@ -365,8 +365,8 @@ async def test_ingestion_skips_paused_feed(
     # Manually mark one as paused (in a copy)
     from api.models import FeedStatus
 
-    paused = configs["bcb_432"].model_copy(update={"status": FeedStatus.PAUSED})
-    test_configs = {"bcb_432": paused}
+    paused = configs["bcb_selic"].model_copy(update={"status": FeedStatus.PAUSED})
+    test_configs = {"bcb_selic": paused}
 
     client = AsyncMock()
     task = IngestionTask(
@@ -419,7 +419,7 @@ async def test_ingestion_backfill_bcb_windowed(
     bcb_selic_data: list,
 ) -> None:
     """BCB backfill should fetch multiple windows and concatenate."""
-    bcb_configs = {"bcb_432": feed_configs["bcb_432"]}
+    bcb_configs = {"bcb_selic": feed_configs["bcb_selic"]}
 
     async def mock_get(url: str, **kwargs: object) -> MagicMock:
         return _make_response(json_data=bcb_selic_data)
@@ -452,8 +452,8 @@ async def test_ingestion_daily_mode_ignores_backfill_url(
     bcb_selic_data: list,
 ) -> None:
     """Without backfill flag, IngestionTask should use the daily URL."""
-    bcb_configs = {"bcb_432": feed_configs["bcb_432"]}
-    daily_url = feed_configs["bcb_432"].source.url
+    bcb_configs = {"bcb_selic": feed_configs["bcb_selic"]}
+    daily_url = feed_configs["bcb_selic"].source.url
 
     async def mock_get(url: str, **kwargs: object) -> MagicMock:
         return _make_response(json_data=bcb_selic_data)

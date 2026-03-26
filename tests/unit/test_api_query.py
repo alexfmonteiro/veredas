@@ -27,18 +27,18 @@ def env_vars(tmp_path: Path) -> None:  # type: ignore[misc]
     gold_dir = tmp_path / "gold"
     gold_dir.mkdir()
 
-    # Write sample gold parquet for bcb_432 (SELIC)
+    # Write sample gold parquet for bcb_selic (SELIC)
     dates = [datetime(2026, 1, 1), datetime(2026, 2, 1), datetime(2026, 3, 1)]
     table = pa.table({
         "date": dates,
         "value": [14.75, 14.75, 14.75],
-        "series": ["bcb_432", "bcb_432", "bcb_432"],
+        "series": ["bcb_selic", "bcb_selic", "bcb_selic"],
         "mom_delta": [None, 0.0, 0.0],
         "yoy_delta": [None, None, None],
         "rolling_12m_avg": [14.75, 14.75, 14.75],
         "z_score": [None, None, None],
     })
-    pq.write_table(table, gold_dir / "bcb_432.parquet")
+    pq.write_table(table, gold_dir / "bcb_selic.parquet")
 
     # Write metadata
     metadata = {
@@ -250,7 +250,7 @@ class TestInsightsLatest:
             {
                 "content": "Economic summary in English",
                 "language": "en",
-                "metric_refs": ["bcb_432", "bcb_433"],
+                "metric_refs": ["bcb_selic", "bcb_ipca"],
                 "model_version": "claude-sonnet-4-20250514",
                 "run_id": "abc123",
                 "generated_at": now,
@@ -261,7 +261,7 @@ class TestInsightsLatest:
             {
                 "content": "Resumo economico em portugues",
                 "language": "pt",
-                "metric_refs": ["bcb_432"],
+                "metric_refs": ["bcb_selic"],
                 "model_version": "claude-sonnet-4-20250514",
                 "run_id": "abc123",
                 "generated_at": now,

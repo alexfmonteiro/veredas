@@ -3,20 +3,20 @@
 from __future__ import annotations
 
 # Display metadata for each tracked series.
-# Internal IDs (bcb_432, etc.) should never appear in the UI.
+# Internal IDs (bcb_selic, etc.) should never appear in the UI.
 # freshness_hours: how many hours without a new data point before the series
 # is considered stale.  Stale = 1× threshold, Critical = 2× threshold.
 # Values reflect each source's publication cadence (daily, monthly, quarterly).
 SERIES_DISPLAY: dict[str, dict[str, str]] = {
-    "bcb_432": {
+    "bcb_selic": {
         "label": "SELIC", "unit": "% a.a.", "source": "BCB", "color": "#3b82f6", "freshness_hours": "72",
         "description": "Benchmark interest rate (taxa SELIC meta) set by Brazil's central bank (COPOM). Higher = tighter monetary policy.",
     },
-    "bcb_433": {
+    "bcb_ipca": {
         "label": "IPCA", "unit": "% a.m.", "source": "BCB", "color": "#8b5cf6", "freshness_hours": "1080",
         "description": "Official month-over-month consumer inflation index (IPCA). Above ~0.5%/month signals strong inflationary pressure.",
     },
-    "bcb_1": {
+    "bcb_usd_brl": {
         "label": "USD/BRL", "unit": "R$", "source": "BCB", "color": "#22c55e", "freshness_hours": "72",
         "description": "Exchange rate: how many reais one US dollar buys. Rising = real weakening.",
     },

@@ -43,7 +43,7 @@ def _(duckdb, os):
 
 @app.cell
 def _(mo):
-    series_input = mo.ui.text(value="bcb_432", label="Series ID")
+    series_input = mo.ui.text(value="bcb_selic", label="Series ID")
     series_input
     return (series_input,)
 

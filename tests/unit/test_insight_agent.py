@@ -73,23 +73,23 @@ class TestDetectAnomalies:
             {"date": f"2024-0{i+1}-01", "value": 10.0} for i in range(9)
         ]
         rows.append({"date": "2024-10-01", "value": 100.0})
-        series_data = {"bcb_432": rows}
+        series_data = {"bcb_selic": rows}
         anomalies = _detect_anomalies(series_data)
         assert len(anomalies) >= 1
-        assert "bcb_432" in anomalies[0]
+        assert "bcb_selic" in anomalies[0]
         assert "100.0" in anomalies[0]
 
     def test_no_anomalies_in_uniform_data(self) -> None:
         rows: list[dict[str, Any]] = [
             {"date": f"2024-0{i+1}-01", "value": 10.0} for i in range(5)
         ]
-        series_data = {"bcb_432": rows}
+        series_data = {"bcb_selic": rows}
         anomalies = _detect_anomalies(series_data)
         assert anomalies == []
 
     def test_skips_series_with_fewer_than_two_values(self) -> None:
         series_data: dict[str, list[dict[str, Any]]] = {
-            "bcb_1": [{"date": "2024-01-01", "value": 5.0}],
+            "bcb_usd_brl": [{"date": "2024-01-01", "value": 5.0}],
         }
         anomalies = _detect_anomalies(series_data)
         assert anomalies == []
@@ -103,11 +103,11 @@ class TestDetectAnomalies:
         ]
         outlier_rows.append({"date": "2024-10-01", "value": 200.0})
         series_data = {
-            "bcb_432": normal_rows,
-            "bcb_433": outlier_rows,
+            "bcb_selic": normal_rows,
+            "bcb_ipca": outlier_rows,
         }
         anomalies = _detect_anomalies(series_data)
-        assert any("bcb_433" in a for a in anomalies)
+        assert any("bcb_ipca" in a for a in anomalies)
 
     def test_skips_none_values(self) -> None:
         rows: list[dict[str, Any]] = [
@@ -115,7 +115,7 @@ class TestDetectAnomalies:
             {"date": "2024-02-01", "value": None},
             {"date": "2024-03-01", "value": 10.0},
         ]
-        series_data = {"bcb_1": rows}
+        series_data = {"bcb_usd_brl": rows}
         # Should not raise — None values are filtered out
         anomalies = _detect_anomalies(series_data)
         assert isinstance(anomalies, list)
@@ -129,13 +129,13 @@ class TestDetectAnomalies:
 class TestFormatGoldSummary:
     def test_basic_formatting(self) -> None:
         series_data: dict[str, list[dict[str, Any]]] = {
-            "bcb_432": [
+            "bcb_selic": [
                 {"date": "2024-01-01", "value": 11.75},
                 {"date": "2024-03-01", "value": 12.25},
             ],
         }
         result = _format_gold_summary(series_data, anomalies=[])
-        assert "bcb_432" in result
+        assert "bcb_selic" in result
         assert "2 data points" in result
         assert "2024-01-01" in result
         assert "2024-03-01" in result
@@ -143,23 +143,23 @@ class TestFormatGoldSummary:
 
     def test_empty_series(self) -> None:
         series_data: dict[str, list[dict[str, Any]]] = {
-            "bcb_1": [],
+            "bcb_usd_brl": [],
         }
         result = _format_gold_summary(series_data, anomalies=[])
-        assert "bcb_1: no data available" in result
+        assert "bcb_usd_brl: no data available" in result
 
     def test_includes_anomalies(self) -> None:
         series_data: dict[str, list[dict[str, Any]]] = {
-            "bcb_432": [{"date": "2024-01-01", "value": 11.0}],
+            "bcb_selic": [{"date": "2024-01-01", "value": 11.0}],
         }
-        anomalies = ["bcb_432 on 2024-01-01: value=11.0, z-score=2.50"]
+        anomalies = ["bcb_selic on 2024-01-01: value=11.0, z-score=2.50"]
         result = _format_gold_summary(series_data, anomalies)
         assert "Anomalies detected" in result
         assert "z-score=2.50" in result
 
     def test_no_anomalies_omits_section(self) -> None:
         series_data: dict[str, list[dict[str, Any]]] = {
-            "bcb_432": [{"date": "2024-01-01", "value": 11.0}],
+            "bcb_selic": [{"date": "2024-01-01", "value": 11.0}],
         }
         result = _format_gold_summary(series_data, anomalies=[])
         assert "Anomalies" not in result
@@ -176,7 +176,7 @@ class TestParseInsightSections:
         now = datetime.now(timezone.utc)
         records = _parse_insight_sections(
             raw, run_id="abc123", generated_at=now,
-            metric_refs=["bcb_432"], confidence_flag=True,
+            metric_refs=["bcb_selic"], confidence_flag=True,
         )
         assert len(records) == 2
         assert records[0].language == "pt"
@@ -184,7 +184,7 @@ class TestParseInsightSections:
         assert records[1].language == "en"
         assert records[1].content == "Summary in English"
         assert records[0].run_id == "abc123"
-        assert records[0].metric_refs == ["bcb_432"]
+        assert records[0].metric_refs == ["bcb_selic"]
 
     def test_fallback_to_en_only(self) -> None:
         raw = "Just some plain text without tags."
@@ -254,9 +254,9 @@ class TestInsightAgentExecute:
     async def test_successful_run_with_pt_en(self) -> None:
         """Full happy-path: gold data available, Claude returns PT+EN, Postgres stores."""
         gold_data: dict[str, list[dict[str, Any]]] = {
-            "bcb_432": _make_gold_rows("bcb_432"),
-            "bcb_433": _make_gold_rows("bcb_433"),
-            "bcb_1": _make_gold_rows("bcb_1"),
+            "bcb_selic": _make_gold_rows("bcb_selic"),
+            "bcb_ipca": _make_gold_rows("bcb_ipca"),
+            "bcb_usd_brl": _make_gold_rows("bcb_usd_brl"),
             "ibge_pnad": _make_gold_rows("ibge_pnad"),
             "ibge_gdp": _make_gold_rows("ibge_gdp"),
             "tesouro_prefixado_curto": _make_gold_rows("tesouro_prefixado_curto"),
@@ -322,7 +322,7 @@ class TestInsightAgentExecute:
     @pytest.mark.asyncio
     async def test_claude_api_error_returns_failure(self) -> None:
         """When Claude API raises an exception, agent should return success=False."""
-        gold_data = {"bcb_432": _make_gold_rows("bcb_432")}
+        gold_data = {"bcb_selic": _make_gold_rows("bcb_selic")}
 
         async def mock_query_gold(series: str, after: str | None = None) -> list[dict[str, Any]]:
             return gold_data.get(series, [])
@@ -347,7 +347,7 @@ class TestInsightAgentExecute:
     @pytest.mark.asyncio
     async def test_postgres_storage_error_returns_failure(self) -> None:
         """When Postgres storage fails, agent should return success=False."""
-        gold_data = {"bcb_432": _make_gold_rows("bcb_432")}
+        gold_data = {"bcb_selic": _make_gold_rows("bcb_selic")}
 
         async def mock_query_gold(series: str, after: str | None = None) -> list[dict[str, Any]]:
             return gold_data.get(series, [])
@@ -392,10 +392,10 @@ class TestInsightAgentExecute:
         async def mock_query_gold(series: str, after: str | None = None) -> list[dict[str, Any]]:
             nonlocal call_count
             call_count += 1
-            if series == "bcb_1":
-                raise RuntimeError("Read error for bcb_1")
-            if series == "bcb_432":
-                return _make_gold_rows("bcb_432")
+            if series == "bcb_usd_brl":
+                raise RuntimeError("Read error for bcb_usd_brl")
+            if series == "bcb_selic":
+                return _make_gold_rows("bcb_selic")
             return []
 
         mock_text_block = atypes.TextBlock(
@@ -425,12 +425,12 @@ class TestInsightAgentExecute:
             result = await agent._execute()
 
         assert result.success is True
-        assert any("bcb_1" in w for w in result.warnings)
+        assert any("bcb_usd_brl" in w for w in result.warnings)
 
     @pytest.mark.asyncio
     async def test_database_url_missing_raises(self) -> None:
         """When DATABASE_URL is missing, _store_insights should raise ValueError."""
-        gold_data = {"bcb_432": _make_gold_rows("bcb_432")}
+        gold_data = {"bcb_selic": _make_gold_rows("bcb_selic")}
 
         async def mock_query_gold(series: str, after: str | None = None) -> list[dict[str, Any]]:
             return gold_data.get(series, [])
@@ -467,7 +467,7 @@ class TestInsightAgentExecute:
 
 class TestComputeAnomalyHash:
     def test_deterministic(self) -> None:
-        anomalies = ["bcb_432 on 2024-01-01: value=10, z-score=2.50", "bcb_1 on 2024-02-01: value=6, z-score=2.10"]
+        anomalies = ["bcb_selic on 2024-01-01: value=10, z-score=2.50", "bcb_usd_brl on 2024-02-01: value=6, z-score=2.10"]
         assert _compute_anomaly_hash(anomalies) == _compute_anomaly_hash(anomalies)
 
     def test_order_independent(self) -> None:
@@ -476,8 +476,8 @@ class TestComputeAnomalyHash:
         assert _compute_anomaly_hash(a) == _compute_anomaly_hash(b)
 
     def test_different_inputs_different_hashes(self) -> None:
-        a = ["bcb_432 on 2024-01-01: value=10, z-score=2.50"]
-        b = ["bcb_433 on 2024-01-01: value=10, z-score=2.50"]
+        a = ["bcb_selic on 2024-01-01: value=10, z-score=2.50"]
+        b = ["bcb_ipca on 2024-01-01: value=10, z-score=2.50"]
         assert _compute_anomaly_hash(a) != _compute_anomaly_hash(b)
 
     def test_returns_16_char_hex(self) -> None:
@@ -488,10 +488,10 @@ class TestComputeAnomalyHash:
 
 class TestExtractZScore:
     def test_extracts_positive(self) -> None:
-        assert _extract_z_score("bcb_432 on 2024-01-01: value=10, z-score=3.14") == pytest.approx(3.14)
+        assert _extract_z_score("bcb_selic on 2024-01-01: value=10, z-score=3.14") == pytest.approx(3.14)
 
     def test_extracts_negative(self) -> None:
-        assert _extract_z_score("bcb_1 on 2020-01-01: value=2.8, z-score=-2.45") == pytest.approx(2.45)
+        assert _extract_z_score("bcb_usd_brl on 2020-01-01: value=2.8, z-score=-2.45") == pytest.approx(2.45)
 
     def test_malformed_returns_zero(self) -> None:
         assert _extract_z_score("no z-score here") == 0.0
@@ -500,13 +500,13 @@ class TestExtractZScore:
 class TestFormatAnomalyPromptData:
     def test_groups_by_series(self) -> None:
         anomalies = [
-            "bcb_432 on 2024-01-01: value=10, z-score=2.50",
-            "bcb_1 on 2024-02-01: value=6, z-score=2.10",
-            "bcb_432 on 2024-02-01: value=11, z-score=2.60",
+            "bcb_selic on 2024-01-01: value=10, z-score=2.50",
+            "bcb_usd_brl on 2024-02-01: value=6, z-score=2.10",
+            "bcb_selic on 2024-02-01: value=11, z-score=2.60",
         ]
         result = _format_anomaly_prompt_data(anomalies)
-        assert "## bcb_1" in result
-        assert "## bcb_432" in result
+        assert "## bcb_usd_brl" in result
+        assert "## bcb_selic" in result
         assert "Total anomalies detected: 3" in result
 
     def test_empty_anomalies(self) -> None:

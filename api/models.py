@@ -429,6 +429,91 @@ class SilverWatermark(BaseModel):
     last_processed_at: datetime
 
 
+# --- Public Domain Config (served to frontend) ---
+
+
+class PublicLocalizedStr(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    en: str
+    pt: str
+
+
+class PublicDomainInfo(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    name: str
+    description: str
+    country: str
+    country_code: str
+    default_language: str
+    supported_languages: list[str]
+
+
+class PublicAIConfig(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    scope_description: PublicLocalizedStr
+    example_indicators: PublicLocalizedStr
+
+
+class PublicDataSource(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    id: str
+    name: str
+    url: str
+    description: PublicLocalizedStr
+
+
+class PublicSeriesConfig(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    label: str
+    unit: str
+    source: str
+    color: str
+    freshness_hours: int
+    domain: str
+    description: PublicLocalizedStr
+    keywords: list[str]
+
+
+class PublicLandingFeature(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    icon: str
+    title: PublicLocalizedStr
+    description: PublicLocalizedStr
+
+
+class PublicAppConfig(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    title: str
+    meta_description: PublicLocalizedStr
+    github_url: str
+
+
+class PublicLandingConfig(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    hero_title: PublicLocalizedStr
+    hero_subtitle: PublicLocalizedStr
+    features: list[PublicLandingFeature]
+
+
+class PublicDomainConfig(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    domain: PublicDomainInfo
+    ai: PublicAIConfig
+    data_sources: list[PublicDataSource]
+    series: dict[str, PublicSeriesConfig]
+    app: PublicAppConfig
+    landing: PublicLandingConfig
+
+
 # Rebuild models with forward references
 HealthResponse.model_rebuild()
 QualityLatestResponse.model_rebuild()

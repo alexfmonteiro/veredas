@@ -160,21 +160,10 @@ export interface SyncStatusResponse {
   sync_health: string;
 }
 
-// --- Series label helper ---
-
-const SERIES_LABELS: Record<string, string> = {
-  bcb_selic: 'SELIC',
-  bcb_ipca: 'IPCA',
-  bcb_usd_brl: 'USD/BRL',
-  ibge_pnad: 'Taxa de Desemprego',
-  ibge_gdp: 'PIB',
-  tesouro_prefixado_curto: 'Prefixado Curto',
-  tesouro_prefixado_longo: 'Prefixado Longo',
-  tesouro_ipca: 'Juros Real (IPCA+)',
-};
+// --- Series label helper (fallback, prefer domain config) ---
 
 export function getSeriesLabel(seriesId: string): string {
-  return SERIES_LABELS[seriesId] ?? seriesId;
+  return seriesId;
 }
 
 // --- Fetchers ---
@@ -261,16 +250,19 @@ export interface RunHistoryResponse {
   total: number;
 }
 
-export const SERIES: SeriesConfig[] = [
-  { id: 'bcb_selic', label: 'SELIC', unit: '% a.a.', source: 'BCB', color: '#3b82f6', freshnessHours: 72 },
-  { id: 'bcb_ipca', label: 'IPCA', unit: '% a.m.', source: 'BCB', color: '#8b5cf6', freshnessHours: 1080 },
-  { id: 'bcb_usd_brl', label: 'USD/BRL', unit: 'R$', source: 'BCB', color: '#22c55e', freshnessHours: 72 },
-  { id: 'ibge_pnad', label: 'Taxa de Desemprego', unit: '%', source: 'IBGE', color: '#f59e0b', freshnessHours: 2400 },
-  { id: 'ibge_gdp', label: 'PIB', unit: 'R$ bi', source: 'IBGE', color: '#06b6d4', freshnessHours: 1080 },
-  { id: 'tesouro_prefixado_curto', label: 'Prefixado Curto', unit: '% a.a.', source: 'Tesouro', color: '#ec4899', freshnessHours: 72 },
-  { id: 'tesouro_prefixado_longo', label: 'Prefixado Longo', unit: '% a.a.', source: 'Tesouro', color: '#f472b6', freshnessHours: 72 },
-  { id: 'tesouro_ipca', label: 'Juros Real (IPCA+)', unit: '% a.a.', source: 'Tesouro', color: '#fb923c', freshnessHours: 72 },
-];
+/** Build SERIES array from domain config. */
+export function buildSeriesFromConfig(
+  series: Record<string, { label: string; unit: string; source: string; color: string; freshness_hours: number }>,
+): SeriesConfig[] {
+  return Object.entries(series).map(([id, s]) => ({
+    id,
+    label: s.label,
+    unit: s.unit,
+    source: s.source,
+    color: s.color,
+    freshnessHours: s.freshness_hours,
+  }));
+}
 
 // --- Query Usage types ---
 

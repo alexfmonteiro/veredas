@@ -8,10 +8,11 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { SERIES, type TimeRange, type SeriesConfig } from '@/lib/api';
+import { buildSeriesFromConfig, type TimeRange, type SeriesConfig } from '@/lib/api';
 import { useMetrics } from '@/hooks/useMetrics';
 import { RangeSelector } from '@/components/RangeSelector';
 import { useLanguage } from '@/lib/LanguageContext';
+import { useDomain, localize } from '@/lib/domain';
 import type { Translations } from '@/lib/i18n';
 
 function formatAxisDate(dateStr: string, locale: string): string {
@@ -44,11 +45,10 @@ interface ChartCardProps {
   range: TimeRange;
   t: Translations;
   locale: string;
+  hint: string;
 }
 
-function ChartCard({ config, range, t, locale }: ChartCardProps) {
-  const label = (t.seriesLabels as Record<string, string>)[config.id] ?? config.label;
-  const hint = (t.seriesHints as Record<string, string>)[config.id] ?? '';
+function ChartCard({ config, range, t, locale, hint }: ChartCardProps) {
   const { data, isLoading, isError } = useMetrics(config.id, range);
 
   const points = data?.data_points ?? [];
@@ -65,7 +65,7 @@ function ChartCard({ config, range, t, locale }: ChartCardProps) {
     <div className="rounded-xl border border-slate-700/50 bg-slate-800/50 p-5">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-sm font-semibold text-slate-200">{label}</h3>
+          <h3 className="text-sm font-semibold text-slate-200">{config.label}</h3>
           <p className="text-[10px] text-slate-500 uppercase tracking-wider">
             {config.source} | {config.unit}
           </p>
@@ -161,7 +161,10 @@ function ChartCard({ config, range, t, locale }: ChartCardProps) {
 export function AnalyticsPage() {
   const [range, setRange] = useState<TimeRange>('2Y');
   const { language, t } = useLanguage();
+  const cfg = useDomain();
   const locale = language === 'pt' ? 'pt-BR' : 'en-US';
+
+  const SERIES = buildSeriesFromConfig(cfg.series);
 
   return (
     <div className="min-h-[calc(100vh-3.5rem)] p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
@@ -178,9 +181,11 @@ export function AnalyticsPage() {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {SERIES.map((s) => (
-          <ChartCard key={s.id} config={s} range={range} t={t} locale={locale} />
-        ))}
+        {SERIES.map((s) => {
+          const seriesCfg = cfg.series[s.id];
+          const hint = seriesCfg ? localize(seriesCfg.description, language) : '';
+          return <ChartCard key={s.id} config={s} range={range} t={t} locale={locale} hint={hint} />;
+        })}
       </div>
     </div>
   );

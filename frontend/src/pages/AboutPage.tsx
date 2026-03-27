@@ -1,14 +1,22 @@
 import { useLanguage } from '@/lib/LanguageContext';
+import { useDomain, localize } from '@/lib/domain';
 
 export function AboutPage() {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
+  const cfg = useDomain();
+
+  const aboutTitle = language === 'pt'
+    ? `Sobre o ${cfg.app.title}`
+    : `About ${cfg.app.title}`;
+
+  const aboutSubtitle = localize(cfg.app.meta_description, language);
 
   return (
     <div className="min-h-[calc(100vh-3.5rem)] p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
       <header className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-100">{t.about.title}</h1>
+        <h1 className="text-2xl font-bold text-slate-100">{aboutTitle}</h1>
         <p className="text-sm text-slate-500 mt-1">
-          {t.about.subtitle}
+          {aboutSubtitle}
         </p>
       </header>
 
@@ -27,9 +35,9 @@ export function AboutPage() {
               <div className="rounded-lg border border-slate-700/50 bg-slate-900/60 p-4">
                 <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-3">Data Sources</p>
                 <div className="flex flex-col gap-2">
-                  <span className="inline-flex items-center rounded-md bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 text-xs text-blue-400">BCB</span>
-                  <span className="inline-flex items-center rounded-md bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 text-xs text-blue-400">IBGE</span>
-                  <span className="inline-flex items-center rounded-md bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 text-xs text-blue-400">Tesouro</span>
+                  {cfg.data_sources.map((ds) => (
+                    <span key={ds.id} className="inline-flex items-center rounded-md bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 text-xs text-blue-400">{ds.name}</span>
+                  ))}
                 </div>
               </div>
 
@@ -91,103 +99,41 @@ export function AboutPage() {
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                {t.about.backend}
-              </h3>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t.about.backend}</h3>
               <ul className="space-y-1.5 text-sm text-slate-300">
-                <li className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-                  Python 3.12 with strict typing
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-                  FastAPI with async/await
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-                  DuckDB for analytical queries
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-                  Pydantic v2 for data validation
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-                  structlog for structured logging
-                </li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand-500" />Python 3.12 with strict typing</li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand-500" />FastAPI with async/await</li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand-500" />DuckDB for analytical queries</li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand-500" />Pydantic v2 for data validation</li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand-500" />structlog for structured logging</li>
               </ul>
             </div>
             <div>
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                {t.about.frontend}
-              </h3>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t.about.frontend}</h3>
               <ul className="space-y-1.5 text-sm text-slate-300">
-                <li className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-                  React 19 with TypeScript
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-                  Vite for build tooling
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-                  TailwindCSS v4 (dark theme)
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-                  Recharts for data visualization
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-                  TanStack Query for data fetching
-                </li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand-500" />React 19 with TypeScript</li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand-500" />Vite for build tooling</li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand-500" />TailwindCSS v4 (dark theme)</li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand-500" />Recharts for data visualization</li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand-500" />TanStack Query for data fetching</li>
               </ul>
             </div>
             <div>
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                {t.about.aiMl}
-              </h3>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t.about.aiMl}</h3>
               <ul className="space-y-1.5 text-sm text-slate-300">
-                <li className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-                  Claude Sonnet (Anthropic API)
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-                  Tiered query routing (Tier 1 regex + Tier 3 LLM)
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-                  Daily AI-generated insight digests
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-                  XML data fencing for prompt safety
-                </li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand-500" />Claude Sonnet (Anthropic API)</li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand-500" />Tiered query routing (Tier 1 regex + Tier 3 LLM)</li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand-500" />Daily AI-generated insight digests</li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand-500" />XML data fencing for prompt safety</li>
               </ul>
             </div>
             <div>
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                {t.about.infrastructure}
-              </h3>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t.about.infrastructure}</h3>
               <ul className="space-y-1.5 text-sm text-slate-300">
-                <li className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-                  Cloudflare R2 (object storage)
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-                  Terraform (IaC)
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-                  GitHub Actions (CI/CD)
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-                  Medallion architecture (Bronze/Silver/Gold)
-                </li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand-500" />Cloudflare R2 (object storage)</li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand-500" />Terraform (IaC)</li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand-500" />GitHub Actions (CI/CD)</li>
+                <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand-500" />Medallion architecture (Bronze/Silver/Gold)</li>
               </ul>
             </div>
           </div>
@@ -199,58 +145,24 @@ export function AboutPage() {
             {t.about.dataSources}
           </h2>
           <div className="space-y-4">
-            <div className="flex items-start gap-4 rounded-lg border border-slate-700/30 bg-slate-900/30 p-4">
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-slate-200">Banco Central do Brasil (BCB)</h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  SELIC rate, IPCA inflation, and USD/BRL exchange rate from the BCB open data API.
-                </p>
-                <a
-                  href="https://www3.bcb.gov.br/sgspub/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-brand-400 hover:text-brand-300 mt-1 inline-block"
-                >
-                  bcb.gov.br/sgspub
-                </a>
+            {cfg.data_sources.map((ds) => (
+              <div key={ds.id} className="flex items-start gap-4 rounded-lg border border-slate-700/30 bg-slate-900/30 p-4">
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-slate-200">{ds.name}</h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {localize(ds.description, language)}
+                  </p>
+                  <a
+                    href={ds.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-brand-400 hover:text-brand-300 mt-1 inline-block"
+                  >
+                    {ds.url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
+                  </a>
+                </div>
               </div>
-            </div>
-
-            <div className="flex items-start gap-4 rounded-lg border border-slate-700/30 bg-slate-900/30 p-4">
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-slate-200">
-                  Instituto Brasileiro de Geografia e Estatistica (IBGE)
-                </h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  Quarterly GDP and unemployment data from the IBGE SIDRA API.
-                </p>
-                <a
-                  href="https://sidra.ibge.gov.br/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-brand-400 hover:text-brand-300 mt-1 inline-block"
-                >
-                  sidra.ibge.gov.br
-                </a>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4 rounded-lg border border-slate-700/30 bg-slate-900/30 p-4">
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-slate-200">Tesouro Nacional</h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  Treasury bond yields and pricing.
-                </p>
-                <a
-                  href="https://www.tesourotransparente.gov.br/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-brand-400 hover:text-brand-300 mt-1 inline-block"
-                >
-                  tesourotransparente.gov.br
-                </a>
-              </div>
-            </div>
+            ))}
           </div>
         </section>
 

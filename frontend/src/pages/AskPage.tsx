@@ -3,6 +3,7 @@ import Markdown from 'react-markdown';
 import { postQuery, getSeriesLabel } from '@/lib/api';
 import type { QueryResponse } from '@/lib/api';
 import { useLanguage } from '@/lib/LanguageContext';
+import { useDomain, localize } from '@/lib/domain';
 import type { Translations } from '@/lib/i18n';
 
 interface Message {
@@ -58,11 +59,40 @@ function DataCitations({ response, t }: { response: QueryResponse; t: Translatio
 
 export function AskPage() {
   const { language, t } = useLanguage();
+  const cfg = useDomain();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [questionCount, setQuestionCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scopeDesc = localize(cfg.ai.scope_description, language);
+  const indicators = localize(cfg.ai.example_indicators, language);
+  const sourceNames = cfg.data_sources.map((ds) => ds.name).join(', ');
+
+  const subtitle = language === 'pt'
+    ? `Faça perguntas sobre ${scopeDesc} em linguagem natural.`
+    : `Ask questions about ${scopeDesc} in natural language.`;
+
+  const placeholder = language === 'pt'
+    ? `Pergunte sobre ${indicators}...`
+    : `Ask about ${indicators}...`;
+
+  const disclaimer = language === 'pt'
+    ? `Respostas geradas por IA podem ser imprecisas. Verifique os dados com fontes oficiais (${sourceNames}).`
+    : `AI-generated responses may be inaccurate. Verify data with official sources (${sourceNames}).`;
+
+  const suggestions = language === 'pt'
+    ? [
+        `Qual é a taxa ${indicators.split(',')[0]?.trim()} atual?`,
+        `Como os indicadores mudaram este ano?`,
+        `Qual é o último dado disponível?`,
+      ]
+    : [
+        `What is the current ${indicators.split(',')[0]?.trim()} rate?`,
+        `How have the indicators changed this year?`,
+        `What is the latest data available?`,
+      ];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -85,7 +115,6 @@ export function AskPage() {
 
     setMessages((prev) => {
       const updated = [...prev, userMsg, loadingMsg];
-      // Keep only last 10 turns (20 messages)
       if (updated.length > 20) {
         return updated.slice(updated.length - 20);
       }
@@ -127,7 +156,7 @@ export function AskPage() {
       <header className="py-6">
         <h1 className="text-2xl font-bold text-slate-100">{t.ask.title}</h1>
         <p className="text-sm text-slate-500 mt-1">
-          {t.ask.subtitle}
+          {subtitle}
         </p>
       </header>
 
@@ -144,7 +173,7 @@ export function AskPage() {
               {t.ask.noQuestions}
             </p>
             <div className="space-y-2">
-              {t.ask.suggestions.map((suggestion) => (
+              {suggestions.map((suggestion) => (
                 <button
                   key={suggestion}
                   onClick={() => setInput(suggestion)}
@@ -219,7 +248,7 @@ export function AskPage() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={t.ask.placeholder}
+            placeholder={placeholder}
             disabled={isSubmitting}
             className="flex-1 rounded-lg border border-slate-700/50 bg-slate-800/50 px-4 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/50 disabled:opacity-50"
           />
@@ -233,7 +262,7 @@ export function AskPage() {
         </form>
 
         <p className="text-[10px] text-slate-600 mt-2 text-center">
-          {t.ask.disclaimer}
+          {disclaimer}
         </p>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
 import { LandingPage } from '@/pages/LandingPage';
 import { Dashboard } from '@/pages/Dashboard';
@@ -8,6 +8,7 @@ import { QualityPage } from '@/pages/QualityPage';
 import { AboutPage } from '@/pages/AboutPage';
 import { AdminPage } from '@/pages/AdminPage';
 import { useLanguage } from '@/lib/LanguageContext';
+import { DomainProvider, useDomain } from '@/lib/domain';
 
 function LanguageToggle() {
   const { language, setLanguage } = useLanguage();
@@ -27,7 +28,12 @@ function LanguageToggle() {
 
 function NavBar() {
   const { t } = useLanguage();
+  const cfg = useDomain();
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    document.title = cfg.app.title;
+  }, [cfg.app.title]);
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     `px-3 py-1.5 rounded-md text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none ${
@@ -47,7 +53,7 @@ function NavBar() {
     <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center h-14 gap-1">
         <NavLink to="/" className="text-lg font-bold text-slate-100 mr-4 shrink-0 whitespace-nowrap">
-          Veredas
+          {cfg.app.title}
         </NavLink>
 
         {/* Desktop nav */}
@@ -97,16 +103,18 @@ function NavBar() {
 function App() {
   return (
     <BrowserRouter>
-      <NavBar />
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/analytics" element={<AnalyticsPage />} />
-        <Route path="/ask" element={<AskPage />} />
-        <Route path="/quality" element={<QualityPage />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/admin" element={<AdminPage />} />
-      </Routes>
+      <DomainProvider>
+        <NavBar />
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/ask" element={<AskPage />} />
+          <Route path="/quality" element={<QualityPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/admin" element={<AdminPage />} />
+        </Routes>
+      </DomainProvider>
     </BrowserRouter>
   );
 }

@@ -47,6 +47,7 @@ from api.models import (
     QueryTier,
     RunHistoryResponse,
     RunManifest,
+    PublicDomainConfig,
     SyncResult,
     SyncStatusResponse,
 )
@@ -180,6 +181,20 @@ async def list_series() -> list[dict[str, str]]:
         {"id": sid, **meta}
         for sid, meta in SERIES_DISPLAY.items()
     ]
+
+
+@app.get("/api/config/domain")
+async def domain_config() -> PublicDomainConfig:
+    """Return the public domain configuration for the frontend."""
+    cfg = get_domain_config()
+    return PublicDomainConfig.model_validate(cfg.model_dump(
+        include={"domain", "ai", "data_sources", "series", "app", "landing"},
+        exclude={
+            "domain": {"id", "currency", "currency_symbol", "timezone"},
+            "ai": {"analyst_role", "safety_message", "anomaly_context"},
+            "app": {"session_cookie_name"},
+        },
+    ))
 
 
 @app.get("/api/query/usage")

@@ -1,7 +1,8 @@
-import { SERIES } from '@/lib/api';
+import { buildSeriesFromConfig } from '@/lib/api';
 import type { SeriesFreshnessData } from '@/lib/api';
 import { useHealth, useSyncStatus, useQualityLatest } from '@/hooks/useMetrics';
 import { useLanguage } from '@/lib/LanguageContext';
+import { useDomain } from '@/lib/domain';
 
 function formatTimestamp(iso: string | null): string {
   if (!iso) return 'Never';
@@ -239,6 +240,9 @@ function SeriesFreshnessRow({ label, freshness }: { label: string; freshness: Se
 function SeriesFreshnessPanel() {
   const { data, isLoading, isError } = useQualityLatest();
   const { t } = useLanguage();
+  const cfg = useDomain();
+  const SERIES_LIST = buildSeriesFromConfig(cfg.series);
+  const seriesMap = cfg.series;
 
   if (isLoading) {
     return (
@@ -269,10 +273,10 @@ function SeriesFreshnessPanel() {
         {t.quality.seriesFreshness}
       </h3>
       <div>
-        {SERIES.map((s) => {
+        {SERIES_LIST.map((s) => {
           const freshness = freshnessMap.get(s.id);
           if (!freshness) return null;
-          const label = (t.seriesLabels as Record<string, string>)[s.id] ?? s.label;
+          const label = seriesMap[s.id]?.label ?? s.label;
           return <SeriesFreshnessRow key={s.id} label={label} freshness={freshness} />;
         })}
       </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SERIES } from '@/lib/api';
+import { buildSeriesFromConfig } from '@/lib/api';
 import type { RunManifest, StageDetail, SeriesFreshnessData } from '@/lib/api';
 import {
   useHealth,
@@ -9,6 +9,7 @@ import {
   useQueryUsage,
 } from '@/hooks/useMetrics';
 import { useLanguage } from '@/lib/LanguageContext';
+import { useDomain } from '@/lib/domain';
 
 // --- Helpers ---
 
@@ -232,7 +233,9 @@ function QualityReportsSection() {
 
 function SeriesFreshnessSection() {
   const { data, isLoading, isError } = useQualityLatest();
-  const { t } = useLanguage();
+  useLanguage(); // ensure re-render on language change
+  const cfg = useDomain();
+  const SERIES = buildSeriesFromConfig(cfg.series);
 
   if (isLoading) return <Card title="Series Freshness"><Skeleton rows={8} /></Card>;
   if (isError || !data) return <Card title="Series Freshness"><p className="text-sm text-slate-500">Unable to load freshness data</p></Card>;
@@ -259,7 +262,7 @@ function SeriesFreshnessSection() {
       {sortedSeries.map((s) => {
         const f: SeriesFreshnessData | undefined = freshnessMap.get(s.id);
         if (!f) return null;
-        const label = (t.seriesLabels as Record<string, string>)[s.id] ?? s.label;
+        const label = cfg.series[s.id]?.label ?? s.label;
         return (
           <div key={s.id} className="grid grid-cols-5 gap-2 py-2 border-b border-slate-700/30 last:border-0 text-xs items-center">
             <span className="text-slate-300 font-medium">{label}</span>

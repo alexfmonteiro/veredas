@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/lib/LanguageContext';
+import { useDomain, localize } from '@/lib/domain';
 
 function FeatureCard({ title, description, icon }: { title: string; description: string; icon: React.ReactNode }) {
   return (
@@ -33,7 +34,7 @@ function DataSourceBadge({ name, description }: { name: string; description: str
 }
 
 // Simple SVG icons to avoid external deps
-const icons = {
+const icons: Record<string, React.ReactNode> = {
   chart: (
     <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
@@ -68,17 +69,19 @@ const icons = {
 };
 
 export function LandingPage() {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
+  const cfg = useDomain();
+  const l = (ls: { en: string; pt: string }) => localize(ls, language);
 
   return (
     <div className="min-h-[calc(100vh-3.5rem)]">
       {/* Hero */}
       <section className="px-4 sm:px-6 lg:px-8 pt-16 pb-20 max-w-7xl mx-auto text-center">
         <h1 className="text-4xl sm:text-5xl font-bold text-slate-100 tracking-tight mb-4">
-          {t.landing.tagline}
+          {l(cfg.landing.hero_title)}
         </h1>
         <p className="text-lg text-slate-400 max-w-2xl mx-auto mb-8 leading-relaxed">
-          {t.landing.valueProposition}
+          {l(cfg.landing.hero_subtitle)}
         </p>
         <Link
           to="/dashboard"
@@ -97,12 +100,14 @@ export function LandingPage() {
           {t.landing.featuresTitle}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <FeatureCard title={t.landing.featureRealTime} description={t.landing.featureRealTimeDesc} icon={icons.chart} />
-          <FeatureCard title={t.landing.featureAi} description={t.landing.featureAiDesc} icon={icons.ai} />
-          <FeatureCard title={t.landing.featureAnomaly} description={t.landing.featureAnomalyDesc} icon={icons.alert} />
-          <FeatureCard title={t.landing.featureMultilingual} description={t.landing.featureMultilingualDesc} icon={icons.globe} />
-          <FeatureCard title={t.landing.featureOpenData} description={t.landing.featureOpenDataDesc} icon={icons.database} />
-          <FeatureCard title={t.landing.featureTransparency} description={t.landing.featureTransparencyDesc} icon={icons.eye} />
+          {cfg.landing.features.map((f, i) => (
+            <FeatureCard
+              key={i}
+              title={l(f.title)}
+              description={l(f.description)}
+              icon={icons[f.icon] ?? icons.chart}
+            />
+          ))}
         </div>
       </section>
 
@@ -112,9 +117,9 @@ export function LandingPage() {
           {t.landing.dataSourcesTitle}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <DataSourceBadge name="BCB" description={t.landing.bcbDesc} />
-          <DataSourceBadge name="IBGE" description={t.landing.ibgeDesc} />
-          <DataSourceBadge name="Tesouro Nacional" description={t.landing.tesouroDesc} />
+          {cfg.data_sources.map((ds) => (
+            <DataSourceBadge key={ds.id} name={ds.name} description={l(ds.description)} />
+          ))}
         </div>
       </section>
 
@@ -137,7 +142,7 @@ export function LandingPage() {
           {t.landing.openSourceDesc}
         </p>
         <a
-          href="https://github.com/alexmonteiro/veredas"
+          href={cfg.app.github_url}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 rounded-lg border border-slate-700/50 bg-slate-800/50 px-5 py-2.5 text-sm font-medium text-slate-300 hover:text-slate-100 hover:border-slate-600/50 transition-colors"
@@ -152,13 +157,13 @@ export function LandingPage() {
       {/* Footer */}
       <footer className="border-t border-slate-800 px-4 sm:px-6 lg:px-8 py-8 max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <span className="font-medium text-slate-400">Veredas</span>
+          <span className="font-medium text-slate-400">{cfg.app.title}</span>
           <div className="flex items-center gap-4">
             <Link to="/about" className="hover:text-slate-300 transition-colors">{t.nav.about}</Link>
             <Link to="/dashboard" className="hover:text-slate-300 transition-colors">{t.nav.dashboard}</Link>
             <Link to="/quality" className="hover:text-slate-300 transition-colors">{t.nav.quality}</Link>
             <a
-              href="https://github.com/alexmonteiro/veredas"
+              href={cfg.app.github_url}
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-slate-300 transition-colors"

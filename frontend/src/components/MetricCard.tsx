@@ -2,6 +2,7 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import { useMetrics } from '@/hooks/useMetrics';
 import type { SeriesConfig, TimeRange } from '@/lib/api';
 import { useLanguage } from '@/lib/LanguageContext';
+import { useDomain, localize } from '@/lib/domain';
 import { Sparkline } from './Sparkline';
 import { DeltaIndicator } from './DeltaIndicator';
 import { FreshnessBadge } from './FreshnessBadge';
@@ -26,10 +27,12 @@ function formatDate(dateStr: string, locale: string): string {
 }
 
 export function MetricCard({ config, range }: MetricCardProps) {
-  const { language, t } = useLanguage();
+  const { language } = useLanguage();
+  const cfg = useDomain();
   const locale = language === 'pt' ? 'pt-BR' : 'en-US';
-  const label = (t.seriesLabels as Record<string, string>)[config.id] ?? config.label;
-  const hint = (t.seriesHints as Record<string, string>)[config.id] ?? '';
+  const seriesCfg = cfg.series[config.id];
+  const label = seriesCfg?.label ?? config.label;
+  const hint = seriesCfg ? localize(seriesCfg.description, language) : '';
   const { data, isLoading, isError } = useMetrics(config.id, range);
 
   if (isLoading) {

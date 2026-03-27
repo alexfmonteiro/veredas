@@ -53,6 +53,7 @@ from api.models import (
 from api.rate_limiter import check_rate_limit, get_remaining_queries
 from api.series_config import SERIES_DISPLAY
 from api.token_tracker import get_usage_summary, log_query
+from config import get_domain_config
 
 logger = structlog.get_logger()
 
@@ -60,7 +61,7 @@ logger = structlog.get_logger()
 _conversation_history: dict[str, list[dict[str, str]]] = {}
 
 _MAX_HISTORY_TURNS = 10
-_SESSION_COOKIE_NAME = "veredas_session"
+_SESSION_COOKIE_NAME = get_domain_config().app.session_cookie_name
 
 # Strong references to fire-and-forget tasks so they aren't garbage-collected
 # before completion.  See: https://docs.python.org/3/library/asyncio-task.html
@@ -93,7 +94,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     yield
 
 
-app = FastAPI(title="Veredas API", version="0.5.0", lifespan=lifespan)
+app = FastAPI(title=f"{get_domain_config().app.title} API", version="0.5.0", lifespan=lifespan)
 
 # --- Middleware ---
 
@@ -292,7 +293,7 @@ async def get_run(run_id: str) -> RunManifest:
 
 @app.post("/api/query")
 async def post_query(body: QueryRequest, request: Request, response: Response) -> QueryResponse:
-    """Answer a user question about Brazilian economic data."""
+    """Answer a user question about economic data."""
     correlation_id = uuid4().hex[:12]
     ip = _get_client_ip(request)
     log = logger.bind(correlation_id=correlation_id, ip=ip)

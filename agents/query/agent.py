@@ -20,13 +20,11 @@ from api.models import (
     QueryTier,
 )
 from api.series_config import SERIES_DISPLAY, get_display_label
+from config import get_domain_config
 from security.sanitize import PromptInjectionError, sanitize_for_prompt
 from security.xml_fencing import build_query_prompt
 
 logger = structlog.get_logger()
-
-# Series that originate from BCB (used for source attribution).
-BCB_SERIES: set[str] = {sid for sid, m in SERIES_DISPLAY.items() if m["source"] == "BCB"}
 
 # All series we know about.
 ALL_SERIES: list[str] = list(SERIES_DISPLAY.keys())
@@ -40,7 +38,7 @@ _MAX_CONTEXT_POINTS = 90
 
 
 class QueryAgent(BaseAgent):
-    """Answer user questions about Brazilian economic indicators.
+    """Answer user questions about economic indicators.
 
     Tier 1 (DIRECT_LOOKUP): simple latest-value questions answered via DuckDB.
     Tier 2 (FULL_LLM): questions answered by Haiku with focused context.
@@ -85,16 +83,13 @@ class QueryAgent(BaseAgent):
             sanitized = sanitize_for_prompt(self._question)
         except PromptInjectionError as exc:
             logger.warning("prompt_injection_blocked", error=str(exc))
-            safety_msg = (
-                "Sua pergunta foi bloqueada pelo nosso filtro de segurança. "
-                "Meu escopo é **exclusivamente análise de dados econômicos brasileiros**. "
-                "Por favor, reformule sua pergunta sobre indicadores como SELIC, IPCA, "
-                "câmbio, PIB ou desemprego."
-                if self._language == "pt"
-                else "Your question was blocked by our safety filter. "
-                "My scope is **exclusively Brazilian economic data analysis**. "
-                "Please rephrase your question about indicators such as SELIC, IPCA, "
-                "exchange rate, GDP, or unemployment."
+            cfg = get_domain_config()
+            lang = self._language if self._language in ("en", "pt") else "en"
+            scope = getattr(cfg.ai.scope_description, lang)
+            indicators = getattr(cfg.ai.example_indicators, lang)
+            raw_msg: str = getattr(cfg.ai.safety_message, lang)
+            safety_msg = raw_msg.format(
+                scope=scope, example_indicators=indicators,
             )
             self._query_response = QueryResponse(
                 answer=safety_msg,
@@ -158,11 +153,7 @@ class QueryAgent(BaseAgent):
 
         series_name = get_display_label(metric)
 
-        source = (
-            "Banco Central do Brasil"
-            if metric in BCB_SERIES
-            else "IBGE"
-        )
+        source = self._source_name_for_series(metric)
 
         if self._language == "pt":
             answer = (
@@ -206,10 +197,9 @@ class QueryAgent(BaseAgent):
         system_prompt, user_message = build_query_prompt(context_data, question)
 
         # Add language instruction
-        if self._language == "pt":
-            system_prompt += "\n\nIMPORTANT: Always respond in Brazilian Portuguese (pt-BR)."
-        else:
-            system_prompt += "\n\nIMPORTANT: Always respond in English."
+        lang_names = {"pt": "Portuguese (pt-BR)", "en": "English"}
+        lang_label = lang_names.get(self._language, "English")
+        system_prompt += f"\n\nIMPORTANT: Always respond in {lang_label}."
 
         self._last_system_prompt = system_prompt
 
@@ -364,18 +354,32 @@ class QueryAgent(BaseAgent):
         return points
 
     @staticmethod
+    def _source_name_for_series(series_id: str) -> str:
+        """Return the human-readable data source name for a series."""
+        cfg = get_domain_config()
+        series_cfg = cfg.series.get(series_id)
+        if not series_cfg:
+            return series_id
+        source_id = series_cfg.source.lower()
+        for ds in cfg.data_sources:
+            if ds.id == source_id:
+                return ds.name
+        return series_cfg.source
+
+    @staticmethod
     def _determine_sources(data_points: list[DataPoint]) -> list[str]:
         """Derive human-readable source names from the data points present."""
+        cfg = get_domain_config()
         sources: set[str] = set()
         for dp in data_points:
-            # Use the display label to infer source
             for sid, meta in SERIES_DISPLAY.items():
                 if get_display_label(sid) == dp.series:
-                    if meta["source"] == "BCB":
-                        sources.add("Banco Central do Brasil")
-                    elif meta["source"] == "IBGE":
-                        sources.add("IBGE")
-                    elif meta["source"] == "Tesouro":
-                        sources.add("Tesouro Nacional")
+                    source_id = meta["source"].lower()
+                    for ds in cfg.data_sources:
+                        if ds.id == source_id:
+                            sources.add(ds.name)
+                            break
+                    else:
+                        sources.add(meta["source"])
                     break
         return sorted(sources)

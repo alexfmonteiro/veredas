@@ -14,10 +14,12 @@ import httpx
 import structlog
 from fastapi import Request, Response
 
+from config import get_domain_config
+
 logger = structlog.get_logger()
 
 _DAILY_QUERY_LIMIT = 10
-_SESSION_COOKIE_NAME = "veredas_session"
+_SESSION_COOKIE_NAME = get_domain_config().app.session_cookie_name
 _SESSION_TOKEN_BYTES = 32
 
 

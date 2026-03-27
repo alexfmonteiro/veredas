@@ -17,7 +17,8 @@ import structlog
 from agents.base import BaseAgent
 from api.dependencies import query_gold_series
 from api.models import AgentResult, InsightRecord
-from api.series_config import SERIES_DISPLAY, get_all_series_ids
+from api.series_config import get_all_series_ids
+from config import get_domain_config
 from security.sanitize import sanitize_for_prompt
 from security.xml_fencing import build_anomaly_prompt, build_insight_prompt
 
@@ -131,10 +132,10 @@ def _format_anomaly_prompt_data(anomalies: list[str]) -> str:
 
 def _build_series_descriptions() -> str:
     """Build a formatted string of series descriptions for the anomaly prompt."""
+    cfg = get_domain_config()
     parts: list[str] = []
-    for sid, meta in SERIES_DISPLAY.items():
-        desc = meta.get("description", "")
-        parts.append(f"{meta['label']} ({sid}): {desc}")
+    for sid, series in cfg.series.items():
+        parts.append(f"{series.label} ({sid}): {series.description.en}")
     return "\n".join(parts)
 
 
@@ -271,10 +272,13 @@ class InsightAgent(BaseAgent):
         system_prompt, user_message = build_insight_prompt(sanitized_summary)
 
         # Append bilingual instruction to user message
+        cfg = get_domain_config()
+        lang_tags = " and ".join(
+            f"<{lang}>...</{lang}>" for lang in cfg.domain.supported_languages
+        )
         user_message_full = (
             f"{user_message}\n\n"
-            "Produce two sections: one in Brazilian Portuguese wrapped in "
-            "<pt>...</pt> tags and one in English wrapped in <en>...</en> tags."
+            f"Produce sections for each supported language, wrapped in tags: {lang_tags}."
         )
 
         # --- Step 4: Call Claude API ---

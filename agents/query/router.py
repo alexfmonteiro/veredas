@@ -7,60 +7,43 @@ import re
 import structlog
 
 from api.models import QueryTier
+from config import get_domain_config
 
 logger = structlog.get_logger()
 
-# ---------------------------------------------------------------------------
-# Regex patterns that identify simple "give me the latest value" questions.
-# Each pattern maps to a lookup strategy name (currently only "latest_value").
-# ---------------------------------------------------------------------------
 
-_METRIC_TERMS = (
-    r"selic|ipca|dolar|dollar|usd|brl|cambio|câmbio|desemprego|unemployment"
-    r"|pib|gdp|tesouro|prefixado|juros real|ntn-b"
+def _build_metric_keywords() -> dict[str, str]:
+    """Build keyword→series_id mapping from DomainConfig."""
+    cfg = get_domain_config()
+    keywords: dict[str, str] = {}
+    for sid, series in cfg.series.items():
+        for kw in series.keywords:
+            keywords[kw] = sid
+    return keywords
+
+
+def _build_lookup_patterns(
+    metric_terms: str,
+) -> dict[re.Pattern[str], str]:
+    """Compile direct lookup patterns from config, injecting keyword terms."""
+    cfg = get_domain_config()
+    patterns: dict[re.Pattern[str], str] = {}
+    for pat_cfg in cfg.router.direct_lookup_patterns:
+        raw = pat_cfg.pattern.replace("{keywords}", metric_terms)
+        patterns[re.compile(raw, re.IGNORECASE)] = pat_cfg.handler
+    return patterns
+
+
+# Module-level lazy cache (populated on first access via QuerySkillRouter or import)
+METRIC_KEYWORDS: dict[str, str] = _build_metric_keywords()
+
+_metric_terms = "|".join(
+    re.escape(k) for k in sorted(METRIC_KEYWORDS, key=len, reverse=True)
 )
 
-DIRECT_LOOKUP_PATTERNS: dict[re.Pattern[str], str] = {
-    re.compile(
-        r"(what|qual|quanto).*(current|atual|hoje|today|now|latest|último|ultima)"
-        rf".*({_METRIC_TERMS})",
-        re.IGNORECASE,
-    ): "latest_value",
-    re.compile(
-        r"(what|qual).*(latest|último|ultima|last|recent)"
-        rf".*({_METRIC_TERMS}|rate|taxa)",
-        re.IGNORECASE,
-    ): "latest_value",
-    re.compile(
-        r"(last|ultimo|última).*(value|valor|dado)"
-        rf".*({_METRIC_TERMS})",
-        re.IGNORECASE,
-    ): "latest_value",
-}
-
-# ---------------------------------------------------------------------------
-# Maps natural-language keywords to canonical series IDs in the gold layer.
-# ---------------------------------------------------------------------------
-
-METRIC_KEYWORDS: dict[str, str] = {
-    "selic": "bcb_selic",
-    "ipca": "bcb_ipca",
-    "dolar": "bcb_usd_brl",
-    "dollar": "bcb_usd_brl",
-    "usd": "bcb_usd_brl",
-    "cambio": "bcb_usd_brl",
-    "câmbio": "bcb_usd_brl",
-    "desemprego": "ibge_pnad",
-    "unemployment": "ibge_pnad",
-    "pib": "ibge_gdp",
-    "gdp": "ibge_gdp",
-    "tesouro": "tesouro_prefixado_curto",
-    "prefixado": "tesouro_prefixado_curto",
-    "prefixado curto": "tesouro_prefixado_curto",
-    "prefixado longo": "tesouro_prefixado_longo",
-    "juros real": "tesouro_ipca",
-    "ntn-b": "tesouro_ipca",
-}
+DIRECT_LOOKUP_PATTERNS: dict[re.Pattern[str], str] = _build_lookup_patterns(
+    _metric_terms,
+)
 
 
 class QuerySkillRouter:

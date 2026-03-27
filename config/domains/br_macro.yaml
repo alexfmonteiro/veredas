@@ -42,13 +42,13 @@ ai:
 
 data_sources:
   - id: bcb
-    name: "Banco Central do Brasil (BCB)"
+    name: "Banco Central do Brasil"
     url: "https://www3.bcb.gov.br/sgspub/"
     description:
       en: "Interest rates (SELIC), inflation (IPCA), exchange rates (USD/BRL)"
       pt: "Taxas de juros (SELIC), inflação (IPCA), câmbio (USD/BRL)"
   - id: ibge
-    name: "Instituto Brasileiro de Geografia e Estatística (IBGE)"
+    name: "IBGE"
     url: "https://sidra.ibge.gov.br/"
     description:
       en: "Unemployment (PNAD), GDP, industrial production"

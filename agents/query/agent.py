@@ -11,7 +11,12 @@ import structlog
 from anthropic.types import MessageParam
 
 from agents.base import BaseAgent
-from agents.query.router import METRIC_KEYWORDS, QuerySkillRouter
+from agents.query.router import (
+    METRIC_KEYWORDS,
+    QuerySkillRouter,
+    detect_domains,
+    get_series_for_domains,
+)
 from api.dependencies import query_gold_series
 from api.models import (
     AgentResult,
@@ -266,18 +271,34 @@ class QueryAgent(BaseAgent):
 
     @staticmethod
     def _extract_relevant_series(question: str) -> list[str]:
-        """Identify which series the question is about using keyword matching.
+        """Identify which series the question is about using keyword + domain matching.
 
-        Returns a list of series IDs. If none detected, returns all series
-        so the model has full context for open-ended questions.
+        Strategy:
+        1. Keyword match → specific series found → return those + same-domain siblings
+        2. No keyword match → domain detection → return all series in matched domains
+        3. No domain match → return ALL_SERIES (safe fallback for ambiguous questions)
         """
         lowered = question.lower()
         found: set[str] = set()
         for keyword, series_id in METRIC_KEYWORDS.items():
             if keyword in lowered:
                 found.add(series_id)
-        # If no specific metric found, include all but with compact summaries
-        return list(found) if found else ALL_SERIES
+
+        if found:
+            # Also include same-domain siblings for richer context
+            domains = detect_domains(question)
+            if domains:
+                domain_series = get_series_for_domains(domains)
+                found.update(domain_series)
+            return list(found)
+
+        # No specific keyword → try domain-level detection
+        domains = detect_domains(question)
+        if domains:
+            return get_series_for_domains(domains)
+
+        # Fully ambiguous → all series
+        return ALL_SERIES
 
     async def _build_compact_context(self, relevant_series: list[str]) -> str:
         """Build a token-efficient context string.

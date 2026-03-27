@@ -445,3 +445,60 @@ class TestQueryAgentDetermineSources:
     def test_empty_data_points(self) -> None:
         sources = QueryAgent._determine_sources([])
         assert sources == []
+
+
+# ---------------------------------------------------------------------------
+# Domain detection and tag-based scoping tests (Wave 2 Session 8)
+# ---------------------------------------------------------------------------
+
+
+class TestDomainDetection:
+    """Tests for domain-level question classification and series scoping."""
+
+    def test_detect_monetary_domain(self) -> None:
+        from agents.query.router import detect_domains
+
+        domains = detect_domains("What is the current SELIC rate?")
+        assert "monetary_policy" in domains
+
+    def test_detect_inflation_domain(self) -> None:
+        from agents.query.router import detect_domains
+
+        domains = detect_domains("How is IPCA inflation trending?")
+        assert "inflation" in domains
+
+    def test_detect_no_domain_for_ambiguous(self) -> None:
+        from agents.query.router import detect_domains
+
+        domains = detect_domains("Tell me about the economy")
+        # "economy" is not a keyword for any series, so no domain detected
+        assert len(domains) == 0
+
+    def test_get_series_for_domains(self) -> None:
+        from agents.query.router import get_series_for_domains
+
+        series = get_series_for_domains(["monetary_policy"])
+        assert "bcb_selic" in series
+        assert "bcb_cdi" in series
+
+    def test_extract_relevant_series_keyword_match_includes_domain(self) -> None:
+        """When a keyword matches, same-domain siblings should be included."""
+        agent = QueryAgent.__new__(QueryAgent)
+        relevant = agent._extract_relevant_series("What is the current SELIC rate?")
+        # Should include bcb_selic (keyword match) AND other monetary_policy series
+        assert "bcb_selic" in relevant
+        assert "bcb_cdi" in relevant  # same domain sibling
+
+    def test_extract_relevant_series_domain_fallback(self) -> None:
+        """When no keyword matches but domain detected, return domain series."""
+        agent = QueryAgent.__new__(QueryAgent)
+        relevant = agent._extract_relevant_series("Como está a inadimplência?")
+        assert "bcb_default_total" in relevant
+
+    def test_extract_relevant_series_all_fallback(self) -> None:
+        """Fully ambiguous questions should return ALL_SERIES."""
+        from agents.query.agent import ALL_SERIES
+
+        agent = QueryAgent.__new__(QueryAgent)
+        relevant = agent._extract_relevant_series("Tell me about the economy")
+        assert relevant == ALL_SERIES

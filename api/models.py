@@ -261,6 +261,7 @@ class FeedSourceConfig(BaseModel):
     url: str
     format: SourceFormat
     auth_method: str = "none"
+    auth_key_env: str | None = None
     rate_limit_rpm: int = 30
     json_data_path: str | None = None
     csv_separator: str = ";"
@@ -307,7 +308,7 @@ class SilverProcessingConfig(BaseModel):
     dedup_columns: list[str] = Field(default_factory=list)
     dedup_order_by: str = "_ingested_at DESC"
     pre_filter: str | None = None
-    aggregation: Literal["avg"] | None = None
+    aggregation: Literal["avg", "sum"] | None = None
 
 
 class FeedProcessingConfig(BaseModel):

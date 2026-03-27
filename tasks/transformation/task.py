@@ -190,12 +190,14 @@ class TransformationTask(BaseTask):
             WHERE {null_filters}
         """
 
-        # Optionally aggregate (e.g. AVG across maturities per date)
-        if feed.processing.silver.aggregation == "avg":
+        # Optionally aggregate (e.g. AVG across maturities, SUM across subsystems)
+        agg_func = feed.processing.silver.aggregation
+        if agg_func in ("avg", "sum"):
+            sql_agg = "AVG" if agg_func == "avg" else "SUM"
             return f"""
                 SELECT
                     date,
-                    AVG(value) AS value,
+                    {sql_agg}(value) AS value,
                     ANY_VALUE(series) AS series,
                     ANY_VALUE(unit) AS unit,
                     MAX(_cleaned_at) AS _cleaned_at,
@@ -226,7 +228,13 @@ class TransformationTask(BaseTask):
             existing_silver = await self._read_existing_silver(series)
             if existing_silver is not None and existing_silver.num_rows > 0:
                 await self._write_gold(series, existing_silver, feed)
-                return existing_silver.num_rows
+                recon = SeriesReconciliation(
+                    series_id=series,
+                    rows_in=0,
+                    rows_out=existing_silver.num_rows,
+                    rows_quarantined=0,
+                )
+                return existing_silver.num_rows, recon
             raise ValueError(f"No new bronze data and no existing silver for {series}")
 
         # Read and concatenate all new bronze files

@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pyarrow.parquet as pq
@@ -473,3 +474,181 @@ async def test_ingestion_daily_mode_ignores_backfill_url(
     assert client.get.call_count == 1
     called_url = client.get.call_args_list[0][0][0]
     assert called_url == daily_url
+
+
+# ---------------------------------------------------------------------------
+# json_data_path + auth tests (Wave 2 Session 3)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio()
+async def test_parse_json_with_json_data_path(
+    storage: LocalStorageBackend,
+) -> None:
+    """json_data_path should extract nested arrays from JSON envelopes."""
+    fred_response = {
+        "observations": [
+            {"date": "2026-03-24", "value": "72.35"},
+            {"date": "2026-03-25", "value": "71.98"},
+        ]
+    }
+    feed_dict = {
+        "feed_id": "fred_test",
+        "name": "FRED Test",
+        "source": {
+            "type": "api",
+            "url": "https://example.com/fred",
+            "format": "json",
+            "json_data_path": "observations",
+        },
+        "schema_fields": [
+            {"name": "date", "source_field": "date", "type": "string", "required": True},
+            {"name": "value", "source_field": "value", "type": "string", "required": True},
+        ],
+    }
+    feed = FeedConfig.model_validate(feed_dict, strict=False)
+    configs = {"fred_test": feed}
+
+    async def mock_get(url: str, **kwargs: object) -> MagicMock:
+        return _make_response(json_data=fred_response)
+
+    client = AsyncMock()
+    client.get = AsyncMock(side_effect=mock_get)
+
+    task = IngestionTask(storage=storage, feed_configs=configs, http_client=client)
+    result = await task.run()
+
+    assert result.success is True
+    assert result.rows_processed == 2
+
+
+@pytest.mark.asyncio()
+async def test_parse_json_array_index_path(
+    storage: LocalStorageBackend,
+) -> None:
+    """json_data_path with numeric key should index into arrays (World Bank format)."""
+    wb_response = [
+        {"page": 1, "pages": 1, "total": 2},
+        [
+            {"date": "2025", "value": "3.2", "countryiso3code": "BRA"},
+            {"date": "2024", "value": "2.9", "countryiso3code": "BRA"},
+        ],
+    ]
+    feed_dict = {
+        "feed_id": "wb_test",
+        "name": "World Bank Test",
+        "source": {
+            "type": "api",
+            "url": "https://example.com/wb",
+            "format": "json",
+            "json_data_path": "1",
+        },
+        "schema_fields": [
+            {"name": "date", "source_field": "date", "type": "string", "required": True},
+            {"name": "value", "source_field": "value", "type": "string", "required": True},
+        ],
+    }
+    feed = FeedConfig.model_validate(feed_dict, strict=False)
+    configs = {"wb_test": feed}
+
+    async def mock_get(url: str, **kwargs: object) -> MagicMock:
+        return _make_response(json_data=wb_response)
+
+    client = AsyncMock()
+    client.get = AsyncMock(side_effect=mock_get)
+
+    task = IngestionTask(storage=storage, feed_configs=configs, http_client=client)
+    result = await task.run()
+
+    assert result.success is True
+    assert result.rows_processed == 2
+
+
+@pytest.mark.asyncio()
+async def test_parse_json_without_json_data_path_unchanged(
+    storage: LocalStorageBackend,
+    bcb_only_configs: dict[str, FeedConfig],
+    bcb_selic_data: list,
+) -> None:
+    """Existing feeds without json_data_path should work exactly as before."""
+    client = _make_mock_client(bcb_only_configs, bcb_selic_data=bcb_selic_data)
+    task = IngestionTask(
+        storage=storage, feed_configs=bcb_only_configs, http_client=client
+    )
+    result = await task.run()
+
+    assert result.success is True
+    assert result.rows_processed > 0
+
+
+@pytest.mark.asyncio()
+async def test_auth_api_key_query_injects_param(
+    storage: LocalStorageBackend,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """api_key_query auth should inject api_key query param from env var."""
+    monkeypatch.setenv("TEST_API_KEY", "secret123")
+
+    feed_dict = {
+        "feed_id": "auth_test",
+        "name": "Auth Test",
+        "source": {
+            "type": "api",
+            "url": "https://example.com/api",
+            "format": "json",
+            "auth_method": "api_key_query",
+            "auth_key_env": "TEST_API_KEY",
+        },
+        "schema_fields": [
+            {"name": "date", "source_field": "date", "type": "string", "required": True},
+            {"name": "value", "source_field": "value", "type": "string", "required": True},
+        ],
+    }
+    feed = FeedConfig.model_validate(feed_dict, strict=False)
+    configs = {"auth_test": feed}
+
+    async def mock_get(url: str, **kwargs: Any) -> MagicMock:
+        # Verify api_key was appended to the URL
+        assert "api_key=secret123" in url
+        return _make_response(json_data=[{"date": "2026-01-01", "value": "42"}])
+
+    client = AsyncMock()
+    client.get = AsyncMock(side_effect=mock_get)
+
+    task = IngestionTask(storage=storage, feed_configs=configs, http_client=client)
+    result = await task.run()
+    assert result.success is True
+
+
+@pytest.mark.asyncio()
+async def test_auth_api_key_missing_env_raises(
+    storage: LocalStorageBackend,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Missing env var for api_key_query auth should produce a warning (not crash pipeline)."""
+    monkeypatch.delenv("MISSING_KEY", raising=False)
+
+    feed_dict = {
+        "feed_id": "auth_fail_test",
+        "name": "Auth Fail Test",
+        "source": {
+            "type": "api",
+            "url": "https://example.com/api",
+            "format": "json",
+            "auth_method": "api_key_query",
+            "auth_key_env": "MISSING_KEY",
+        },
+        "schema_fields": [
+            {"name": "v", "source_field": "v", "type": "string", "required": True},
+        ],
+    }
+    feed = FeedConfig.model_validate(feed_dict, strict=False)
+    configs = {"auth_fail_test": feed}
+
+    client = AsyncMock()
+    task = IngestionTask(storage=storage, feed_configs=configs, http_client=client)
+    result = await task.run()
+
+    # Should fail gracefully (warning, not crash)
+    assert result.success is False
+    assert any("MISSING_KEY" in w for w in result.warnings)

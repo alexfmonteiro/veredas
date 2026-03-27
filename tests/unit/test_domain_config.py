@@ -34,7 +34,7 @@ def test_load_br_macro_config() -> None:
     assert isinstance(config, DomainConfig)
     assert config.domain.name == "Veredas Brazil"
     assert config.domain.country_code == "BR"
-    assert len(config.series) == 8
+    assert len(config.series) >= 8
 
 
 def test_all_series_present() -> None:

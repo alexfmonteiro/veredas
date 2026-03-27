@@ -22,6 +22,24 @@ def _build_metric_keywords() -> dict[str, str]:
     return keywords
 
 
+def _build_domain_map() -> dict[str, list[str]]:
+    """Build domain→[series_ids] mapping from DomainConfig."""
+    cfg = get_domain_config()
+    domain_map: dict[str, list[str]] = {}
+    for sid, series in cfg.series.items():
+        domain_map.setdefault(series.domain, []).append(sid)
+    return domain_map
+
+
+def _build_domain_keywords() -> dict[str, list[str]]:
+    """Build domain→[keywords] for domain-level question classification."""
+    cfg = get_domain_config()
+    dkw: dict[str, list[str]] = {}
+    for _sid, series in cfg.series.items():
+        dkw.setdefault(series.domain, []).extend(series.keywords)
+    return dkw
+
+
 def _build_lookup_patterns(
     metric_terms: str,
 ) -> dict[re.Pattern[str], str]:
@@ -34,8 +52,10 @@ def _build_lookup_patterns(
     return patterns
 
 
-# Module-level lazy cache (populated on first access via QuerySkillRouter or import)
+# Module-level lazy caches
 METRIC_KEYWORDS: dict[str, str] = _build_metric_keywords()
+DOMAIN_MAP: dict[str, list[str]] = _build_domain_map()
+DOMAIN_KEYWORDS: dict[str, list[str]] = _build_domain_keywords()
 
 _metric_terms = "|".join(
     re.escape(k) for k in sorted(METRIC_KEYWORDS, key=len, reverse=True)
@@ -44,6 +64,29 @@ _metric_terms = "|".join(
 DIRECT_LOOKUP_PATTERNS: dict[re.Pattern[str], str] = _build_lookup_patterns(
     _metric_terms,
 )
+
+
+def detect_domains(question: str) -> list[str]:
+    """Detect which domains a question relates to by scanning domain keywords.
+
+    Returns a list of domain names. Empty list if no domain detected (ambiguous).
+    """
+    lowered = question.lower()
+    found: set[str] = set()
+    for domain, keywords in DOMAIN_KEYWORDS.items():
+        for kw in keywords:
+            if kw in lowered:
+                found.add(domain)
+                break
+    return list(found)
+
+
+def get_series_for_domains(domains: list[str]) -> list[str]:
+    """Return all series IDs belonging to the given domains."""
+    series: list[str] = []
+    for domain in domains:
+        series.extend(DOMAIN_MAP.get(domain, []))
+    return series
 
 
 class QuerySkillRouter:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import logging
 import sys
 from datetime import datetime, timezone
 
@@ -34,12 +35,22 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Fetch full historical data instead of daily delta",
     )
+    parser.add_argument(
+        "--log-level",
+        default="debug",
+        choices=["debug", "info", "warning", "error"],
+        help="Minimum log level (default: debug)",
+    )
     return parser.parse_args()
 
 
 async def main() -> int:
     """Run the full pipeline: Ingest → Quality → Transform → Quality → Insight."""
     args = parse_args()
+
+    level = getattr(logging, args.log_level.upper())
+    structlog.configure(wrapper_class=structlog.make_filtering_bound_logger(level))
+
     storage = get_storage_backend()
     feed_configs = load_feed_configs()
     run_id = f"pipeline-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"

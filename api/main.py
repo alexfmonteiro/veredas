@@ -58,10 +58,11 @@ from config import get_domain_config
 
 logger = structlog.get_logger()
 
-# In-memory conversation history per session (max 10 turns).
+# In-memory conversation history fallback (used when Redis unavailable).
 _conversation_history: dict[str, list[dict[str, str]]] = {}
 
 _MAX_HISTORY_TURNS = 10
+_CONV_TTL_SECONDS = 86400  # 24 hours
 _SESSION_COOKIE_NAME = get_domain_config().app.session_cookie_name
 
 # Strong references to fire-and-forget tasks so they aren't garbage-collected
@@ -92,6 +93,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         )
 
     logger.info("app_started", env=os.environ.get("APP_ENV", "unknown"))
+
+    # Warm gold data cache for all known series
+    from api.dependencies import query_gold_series
+    from api.series_config import get_all_series_ids
+
+    warmed = 0
+    for series_id in get_all_series_ids():
+        try:
+            await query_gold_series(series_id)
+            warmed += 1
+        except Exception:
+            logger.warning("cache_warm_failed", series=series_id)
+    logger.info("cache_warm_complete", series_warmed=warmed)
+
     yield
 
 
@@ -144,18 +159,63 @@ def _get_session_id(request: Request) -> str:
     return _get_client_ip(request)
 
 
-def _get_history(session_id: str) -> list[dict[str, str]]:
-    """Return conversation history for a session, capped at max turns."""
-    return _conversation_history.get(session_id, [])
+def _upstash_available() -> bool:
+    return bool(os.environ.get("UPSTASH_REDIS_URL")) and bool(os.environ.get("UPSTASH_REDIS_TOKEN"))
 
 
-def _append_history(session_id: str, role: str, content: str) -> None:
-    """Append a turn to conversation history, enforcing max turns."""
+def _upstash_headers() -> dict[str, str]:
+    return {"Authorization": f"Bearer {os.environ['UPSTASH_REDIS_TOKEN']}"}
+
+
+async def _get_history(session_id: str) -> list[dict[str, str]]:
+    """Return conversation history — Redis-backed with in-memory fallback."""
+    if not _upstash_available():
+        return _conversation_history.get(session_id, [])
+
+    try:
+        key = f"conv:{session_id}"
+        url = os.environ["UPSTASH_REDIS_URL"]
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{url}/get/{key}",
+                headers=_upstash_headers(),
+                timeout=5.0,
+            )
+            body = resp.json()
+            result = body.get("result")
+            if result is None:
+                return []
+            return json.loads(result)  # type: ignore[no-any-return]
+    except Exception as exc:
+        logger.warning("conv_redis_get_failed", error=str(exc))
+        return _conversation_history.get(session_id, [])
+
+
+async def _append_history(session_id: str, role: str, content: str) -> None:
+    """Append a turn to history — Redis-backed with in-memory fallback."""
+    # Always update in-memory (serves as fallback)
     if session_id not in _conversation_history:
         _conversation_history[session_id] = []
     _conversation_history[session_id].append({"role": role, "content": content})
     if len(_conversation_history[session_id]) > _MAX_HISTORY_TURNS:
         _conversation_history[session_id] = _conversation_history[session_id][-_MAX_HISTORY_TURNS:]
+
+    if not _upstash_available():
+        return
+
+    try:
+        key = f"conv:{session_id}"
+        url = os.environ["UPSTASH_REDIS_URL"]
+        payload = json.dumps(_conversation_history[session_id])
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                url,
+                headers=_upstash_headers(),
+                json=["SET", key, payload, "EX", _CONV_TTL_SECONDS],
+                timeout=5.0,
+            )
+    except Exception as exc:
+        logger.warning("conv_redis_set_failed", error=str(exc))
 
 
 # --- Routes ---
@@ -332,7 +392,7 @@ async def post_query(body: QueryRequest, request: Request, response: Response) -
 
     # Build agent with conversation history
     session_id = _get_session_id(request)
-    history = _get_history(session_id)
+    history = await _get_history(session_id)
     agent = QueryAgent(question=body.question, history=history, language=body.language)
 
     # Execute with 30s timeout
@@ -365,9 +425,13 @@ async def post_query(body: QueryRequest, request: Request, response: Response) -
         log.warning("query_guardrail_triggered", errors=result.errors)
         return query_resp
 
-    # Update conversation history
-    _append_history(session_id, "user", body.question)
-    _append_history(session_id, "assistant", query_resp.answer)
+    # Update conversation history (fire-and-forget)
+    _spawn_background(
+        _append_history(session_id, "user", body.question)
+    )
+    _spawn_background(
+        _append_history(session_id, "assistant", query_resp.answer)
+    )
 
     log.info(
         "query_completed",
@@ -441,7 +505,7 @@ async def query_stream(
         return StreamingResponse(_cached_generator(), media_type="text/event-stream")
 
     session_id = _get_session_id(request)
-    history = _get_history(session_id)
+    history = await _get_history(session_id)
 
     async def _event_generator() -> AsyncGenerator[str, None]:
         agent = QueryAgent(question=body.question, history=history, language=body.language)
@@ -499,8 +563,8 @@ async def query_stream(
         yield f"data: {done_payload}\n\n"
 
         # Update conversation history
-        _append_history(session_id, "user", body.question)
-        _append_history(session_id, "assistant", qr.answer)
+        await _append_history(session_id, "user", body.question)
+        await _append_history(session_id, "assistant", qr.answer)
 
         log.info(
             "stream_query_completed",

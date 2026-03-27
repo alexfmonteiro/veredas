@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import os
@@ -23,6 +24,9 @@ logger = structlog.get_logger()
 
 _gold_cache: dict[str, tuple[float, bytes]] = {}
 _CACHE_TTL_SECONDS = 300  # 5 minutes
+
+# --- Request coalescing: prevent thundering herd on cache miss ---
+_inflight: dict[str, asyncio.Future[bytes | None]] = {}
 
 
 def _is_r2_mode() -> bool:
@@ -81,30 +85,54 @@ def get_sync_health(sync_info: SyncInfo | None) -> FreshnessStatus:
     return FreshnessStatus.CRITICAL
 
 
-async def _read_gold_bytes(series: str) -> bytes | None:
-    """Read gold parquet bytes — from R2 (cached) or local disk."""
-    if _is_r2_mode():
-        now = time.monotonic()
+async def _read_gold_bytes_inner(series: str) -> bytes | None:
+    """Read gold parquet bytes from R2 (no coalescing)."""
+    now = time.monotonic()
 
-        # Check cache
-        if series in _gold_cache:
-            cached_at, data = _gold_cache[series]
-            if now - cached_at < _CACHE_TTL_SECONDS:
-                return data
-
-        try:
-            from storage.r2 import R2StorageBackend
-            r2 = R2StorageBackend()
-            key = f"gold/{series}.parquet"
-            if not await r2.exists(key):
-                return None
-            data = await r2.read(key)
-            _gold_cache[series] = (now, data)
-            logger.debug("gold_r2_read", series=series, size=len(data))
+    # Check cache
+    if series in _gold_cache:
+        cached_at, data = _gold_cache[series]
+        if now - cached_at < _CACHE_TTL_SECONDS:
             return data
-        except Exception as exc:
-            logger.warning("gold_r2_read_error", series=series, error=str(exc))
+
+    try:
+        from storage.r2 import R2StorageBackend
+        r2 = R2StorageBackend()
+        key = f"gold/{series}.parquet"
+        if not await r2.exists(key):
             return None
+        data = await r2.read(key)
+        _gold_cache[series] = (time.monotonic(), data)
+        logger.debug("gold_r2_read", series=series, size=len(data))
+        return data
+    except Exception as exc:
+        logger.warning("gold_r2_read_error", series=series, error=str(exc))
+        return None
+
+
+async def _read_gold_bytes(series: str) -> bytes | None:
+    """Read gold parquet bytes — from R2 (coalesced + cached) or local disk.
+
+    Coalescing: if multiple concurrent requests ask for the same series,
+    only one reads from storage; others await the same Future.
+    """
+    if _is_r2_mode():
+        # Request coalescing for R2 reads
+        if series in _inflight:
+            return await _inflight[series]
+
+        loop = asyncio.get_running_loop()
+        future: asyncio.Future[bytes | None] = loop.create_future()
+        _inflight[series] = future
+        try:
+            result = await _read_gold_bytes_inner(series)
+            future.set_result(result)
+            return result
+        except Exception as exc:
+            future.set_exception(exc)
+            raise
+        finally:
+            _inflight.pop(series, None)
 
     # Local mode
     parquet_path = get_gold_dir() / f"{series}.parquet"

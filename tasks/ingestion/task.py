@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import os
 from datetime import datetime, timezone
 from typing import Any
 
@@ -76,7 +77,9 @@ class IngestionTask(BaseTask):
         reconciliation: list[SeriesReconciliation] = []
         owns_client = self._http_client is None
         timeout = 120.0 if self._backfill else 60.0
-        client = self._http_client or httpx.AsyncClient(timeout=timeout)
+        client = self._http_client or httpx.AsyncClient(
+            timeout=timeout, follow_redirects=True
+        )
 
         try:
             for feed_id, feed in self._feed_configs.items():
@@ -121,6 +124,15 @@ class IngestionTask(BaseTask):
         url = feed.source.url
         if self._backfill and feed.source.backfill_url:
             url = feed.source.backfill_url
+
+        if feed.source.auth_method == "api_key_query" and feed.source.auth_key_env:
+            api_key = os.environ.get(feed.source.auth_key_env, "")
+            if not api_key:
+                raise ValueError(
+                    f"Missing env var {feed.source.auth_key_env} for feed {feed.feed_id}"
+                )
+            separator = "&" if "?" in url else "?"
+            url = f"{url}{separator}api_key={api_key}"
 
         response = await client.get(url)
         response.raise_for_status()
@@ -254,8 +266,19 @@ class IngestionTask(BaseTask):
     def _parse_json(
         self, response: Any, feed: FeedConfig
     ) -> list[dict[str, Any]]:
-        """Parse JSON response, applying skip_rows if configured."""
+        """Parse JSON response, optionally extracting nested data via json_data_path."""
         data = response.json()
+
+        if feed.source.json_data_path:
+            for key in feed.source.json_data_path.split("."):
+                if isinstance(data, dict):
+                    data = data.get(key, [])
+                elif isinstance(data, list) and key.isdigit():
+                    idx = int(key)
+                    data = data[idx] if idx < len(data) else []
+                else:
+                    return []
+
         if not isinstance(data, list):
             return []
         if feed.source.skip_rows > 0:

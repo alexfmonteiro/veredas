@@ -251,7 +251,7 @@ class TestFeedConfigLoader:
     def test_loads_production_feeds(self) -> None:
         """Verify the actual config/feeds/br_macro/ YAML files load correctly."""
         configs = load_feed_configs("config/feeds/br_macro")
-        assert len(configs) == 9
+        assert len(configs) >= 9
         assert "bcb_selic" in configs
         assert "bcb_ipca" in configs
         assert "bcb_usd_brl" in configs

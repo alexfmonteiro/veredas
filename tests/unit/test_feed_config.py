@@ -249,8 +249,8 @@ class TestFeedConfigLoader:
         assert "good" in configs
 
     def test_loads_production_feeds(self) -> None:
-        """Verify the actual data/feeds/ YAML files load correctly."""
-        configs = load_feed_configs("data/feeds")
+        """Verify the actual config/feeds/br_macro/ YAML files load correctly."""
+        configs = load_feed_configs("config/feeds/br_macro")
         assert len(configs) == 9
         assert "bcb_selic" in configs
         assert "bcb_ipca" in configs
@@ -279,7 +279,7 @@ class TestFeedConfigLoader:
 
     def test_bcb_backfill_fields(self) -> None:
         """BCB feeds should have backfill configuration."""
-        configs = load_feed_configs("data/feeds")
+        configs = load_feed_configs("config/feeds/br_macro")
         for feed_id in ("bcb_selic", "bcb_ipca", "bcb_usd_brl"):
             feed = configs[feed_id]
             assert feed.source.backfill_url is not None
@@ -290,7 +290,7 @@ class TestFeedConfigLoader:
 
     def test_ibge_pnad_backfill_fields(self) -> None:
         """IBGE PNAD should have backfill URL with p/all."""
-        configs = load_feed_configs("data/feeds")
+        configs = load_feed_configs("config/feeds/br_macro")
         feed = configs["ibge_pnad"]
         assert feed.source.backfill_url is not None
         assert "p/all" in feed.source.backfill_url
@@ -298,7 +298,7 @@ class TestFeedConfigLoader:
 
     def test_gdp_backfill_fields(self) -> None:
         """GDP feed should have BCB-style backfill with windowing."""
-        configs = load_feed_configs("data/feeds")
+        configs = load_feed_configs("config/feeds/br_macro")
         feed = configs["ibge_gdp"]
         assert feed.source.backfill_url is not None
         assert feed.source.backfill_window_years == 10

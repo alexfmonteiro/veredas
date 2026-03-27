@@ -23,7 +23,7 @@ def storage(tmp_path: Path) -> LocalStorageBackend:
 
 @pytest.fixture()
 def feed_configs() -> dict[str, FeedConfig]:
-    return load_feed_configs("data/feeds")
+    return load_feed_configs("config/feeds/br_macro")
 
 
 def _write_parquet(storage_path: Path, key: str, columns: dict[str, object]) -> None:
@@ -183,7 +183,7 @@ async def test_quality_rescued_data_rate(tmp_path: Path) -> None:
         rescued_col=['{"extra": "val"}', '{"extra": "val"}', None, None],
     )
     storage = LocalStorageBackend(tmp_path)
-    configs = load_feed_configs("data/feeds")
+    configs = load_feed_configs("config/feeds/br_macro")
     task = QualityTask(
         storage=storage,
         stage=PipelineStage.POST_INGESTION,
@@ -240,7 +240,7 @@ async def test_quality_gold_value_range(tmp_path: Path) -> None:
         "z_score": [None, None],
     })
     storage = LocalStorageBackend(tmp_path)
-    configs = load_feed_configs("data/feeds")
+    configs = load_feed_configs("config/feeds/br_macro")
     task = QualityTask(
         storage=storage,
         stage=PipelineStage.POST_TRANSFORMATION,

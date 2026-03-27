@@ -1,8 +1,9 @@
-"""Feed config loader — reads YAML data contracts from data/feeds/."""
+"""Feed config loader — reads YAML data contracts from config/feeds/{domain_id}/."""
 
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import unicodedata
 from pathlib import Path
@@ -54,16 +55,23 @@ def compute_schema_hash(feed: FeedConfig) -> str:
     return hashlib.sha256(payload).hexdigest()[:16]
 
 
+def _default_feeds_dir() -> Path:
+    """Return the default feeds directory based on DOMAIN_ID."""
+    domain_id = os.environ.get("DOMAIN_ID", "br_macro")
+    return Path("config/feeds") / domain_id
+
+
 def load_feed_configs(
-    feeds_dir: str | Path = "data/feeds",
+    feeds_dir: str | Path | None = None,
     *,
     include_inactive: bool = False,
 ) -> dict[str, FeedConfig]:
     """Load all YAML feed configs from the given directory.
 
+    When feeds_dir is None, resolves to config/feeds/{DOMAIN_ID}/.
     Returns a dict keyed by feed_id. Only active feeds by default.
     """
-    feeds_path = Path(feeds_dir)
+    feeds_path = Path(feeds_dir) if feeds_dir is not None else _default_feeds_dir()
     if not feeds_path.is_dir():
         logger.warning("feed_config_dir_not_found", path=str(feeds_path))
         return {}

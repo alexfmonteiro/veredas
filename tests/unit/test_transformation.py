@@ -24,7 +24,7 @@ def storage(tmp_path: Path) -> LocalStorageBackend:
 
 @pytest.fixture()
 def feed_configs() -> dict[str, FeedConfig]:
-    return load_feed_configs("data/feeds")
+    return load_feed_configs("config/feeds/br_macro")
 
 
 @pytest.fixture()

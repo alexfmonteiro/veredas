@@ -44,7 +44,7 @@ def storage(tmp_path: Path) -> LocalStorageBackend:
 
 @pytest.fixture()
 def feed_configs() -> dict[str, FeedConfig]:
-    return load_feed_configs("data/feeds")
+    return load_feed_configs("config/feeds/br_macro")
 
 
 @pytest.fixture()
@@ -361,7 +361,7 @@ async def test_ingestion_skips_paused_feed(
     storage: LocalStorageBackend,
 ) -> None:
     """Feeds with status != active should be skipped."""
-    configs = load_feed_configs("data/feeds")
+    configs = load_feed_configs("config/feeds/br_macro")
     # Manually mark one as paused (in a copy)
     from api.models import FeedStatus
 

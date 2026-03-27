@@ -8,7 +8,7 @@ This project values production discipline: every change must be tested, typed, l
 
 ### New Data Series
 
-1. Create a feed config YAML in `data/schemas/feeds/` following the existing patterns
+1. Create a feed config YAML in `config/feeds/{domain_id}/` following the existing patterns
 2. Add the series ID to `SERIES` in `frontend/src/lib/api.ts`
 3. Add fixture data in `tests/fixtures/`
 4. Write tests for ingestion and transformation

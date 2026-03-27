@@ -20,7 +20,11 @@ environment variable (defaults to `br_macro`).
    - `app`: title, cookie name, GitHub URL
    - `landing`: hero text, feature cards (bilingual)
 
-3. **Create feed configs** in `data/feeds/` for each series in your domain.
+3. **Create feed configs** in `config/feeds/{domain_id}/` for each series:
+   ```bash
+   mkdir config/feeds/my_domain
+   # Create one YAML per series (copy from config/feeds/br_macro/ as template)
+   ```
    Each feed YAML defines the ingestion source, schedule, and processing rules.
 
 4. **Set the environment variable**:

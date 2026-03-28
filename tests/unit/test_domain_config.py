@@ -213,6 +213,21 @@ def test_second_domain_data_sources() -> None:
     assert "bcb" not in source_ids
 
 
+def test_chart_granularity_default() -> None:
+    """Series without explicit chart_granularity default to 'day'."""
+    config = load_domain_config("br_macro")
+    # bcb_selic has no explicit chart_granularity → should default to "day"
+    assert config.series["bcb_selic"].chart_granularity == "day"
+
+
+def test_chart_granularity_explicit() -> None:
+    """Series with explicit chart_granularity parse correctly."""
+    config = load_domain_config("br_macro")
+    assert config.series["bcb_ipca"].chart_granularity == "month"
+    assert config.series["wb_gdp_growth"].chart_granularity == "year"
+    assert config.series["focus_ipca"].chart_granularity == "week"
+
+
 def test_domains_are_isolated() -> None:
     """Loading different domains produces different prompts."""
     from security.xml_fencing import build_insight_prompt

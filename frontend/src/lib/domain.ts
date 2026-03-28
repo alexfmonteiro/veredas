@@ -38,6 +38,7 @@ export interface DomainSeriesConfig {
   domain: string;
   description: LocalizedStr;
   keywords: string[];
+  chart_granularity?: string;
 }
 
 export interface DomainLandingFeature {

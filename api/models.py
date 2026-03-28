@@ -30,6 +30,13 @@ class FreshnessStatus(str, Enum):
     CRITICAL = "critical"
 
 
+class ChartGranularity(str, Enum):
+    DAY = "day"
+    WEEK = "week"
+    MONTH = "month"
+    YEAR = "year"
+
+
 class PipelineStage(str, Enum):
     POST_INGESTION = "post_ingestion"
     POST_TRANSFORMATION = "post_transformation"
@@ -175,6 +182,7 @@ class MetricsResponse(BaseModel):
     series: str
     data_points: list[MetricDataPoint] = Field(default_factory=list)
     last_updated: datetime | None = None
+    aggregation: ChartGranularity = ChartGranularity.DAY
 
 
 # --- Sync Webhook ---
@@ -506,6 +514,7 @@ class PublicSeriesConfig(BaseModel):
     domain: str
     description: PublicLocalizedStr
     keywords: list[str]
+    chart_granularity: str = "day"
 
 
 class PublicLandingFeature(BaseModel):

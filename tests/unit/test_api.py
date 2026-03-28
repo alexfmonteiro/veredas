@@ -501,3 +501,39 @@ async def test_conversation_history_max_turns() -> None:
 
     # Cleanup
     _conversation_history.pop(test_sid, None)
+
+
+# --- Chart granularity / group_by tests ---
+
+
+@pytest.mark.asyncio
+async def test_metrics_with_group_by_param() -> None:
+    """Passing group_by=month returns aggregated data with aggregation field."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get("/api/metrics/bcb_selic?group_by=month")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["aggregation"] == "month"
+    assert len(data["data_points"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_metrics_invalid_group_by() -> None:
+    """Invalid group_by value returns 400."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get("/api/metrics/bcb_selic?group_by=invalid")
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_metrics_default_aggregation() -> None:
+    """Without group_by param, aggregation should reflect config default."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get("/api/metrics/bcb_selic")
+    assert resp.status_code == 200
+    data = resp.json()
+    # bcb_selic defaults to "day" (no chart_granularity set in YAML)
+    assert data["aggregation"] == "day"

@@ -8,9 +8,10 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { buildSeriesFromConfig, type TimeRange, type SeriesConfig } from '@/lib/api';
+import { buildSeriesFromConfig, type TimeRange, type SeriesConfig, type ChartGranularity } from '@/lib/api';
 import { useMetrics } from '@/hooks/useMetrics';
 import { RangeSelector } from '@/components/RangeSelector';
+import { GranularitySelector } from '@/components/GranularitySelector';
 import { useLanguage } from '@/lib/LanguageContext';
 import { useDomain, localize } from '@/lib/domain';
 import type { Translations } from '@/lib/i18n';
@@ -49,7 +50,8 @@ interface ChartCardProps {
 }
 
 function ChartCard({ config, range, t, locale, hint }: ChartCardProps) {
-  const { data, isLoading, isError } = useMetrics(config.id, range);
+  const [granularity, setGranularity] = useState<ChartGranularity>(config.chartGranularity);
+  const { data, isLoading, isError } = useMetrics(config.id, range, granularity);
 
   const points = data?.data_points ?? [];
   const chartData = points.map((p) => ({
@@ -62,8 +64,8 @@ function ChartCard({ config, range, t, locale, hint }: ChartCardProps) {
   }, [config, chartData]);
 
   return (
-    <div className="rounded-xl border border-slate-700/50 bg-slate-800/50 p-5">
-      <div className="flex items-center justify-between mb-4">
+    <div className="flex flex-col rounded-xl border border-slate-700/50 bg-slate-800/50 p-5">
+      <div className="flex items-start justify-between mb-4">
         <div>
           <h3 className="text-sm font-semibold text-slate-200">{config.label}</h3>
           <p className="text-[10px] text-slate-500 uppercase tracking-wider">
@@ -78,82 +80,89 @@ function ChartCard({ config, range, t, locale, hint }: ChartCardProps) {
         <button
           onClick={handleDownload}
           disabled={chartData.length === 0}
-          className="cursor-pointer text-[10px] text-slate-500 hover:text-slate-300 transition-colors border border-slate-700/50 rounded-md px-2 py-1 disabled:opacity-30 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
+          className="cursor-pointer shrink-0 text-[10px] text-slate-500 hover:text-slate-300 transition-colors border border-slate-700/50 rounded-md px-2 py-1 disabled:opacity-30 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
         >
           {t.analytics.exportCsv}
         </button>
       </div>
 
-      {isLoading && (
-        <div className="h-48 flex items-center justify-center">
-          <div className="h-4 w-4 rounded-full border-2 border-brand-500 border-t-transparent animate-spin" />
+      <div className="flex-1 flex flex-col justify-end">
+        {isLoading && (
+          <div className="h-48 flex items-center justify-center">
+            <div className="h-4 w-4 rounded-full border-2 border-brand-500 border-t-transparent animate-spin" />
+          </div>
+        )}
+
+        {isError && (
+          <div className="h-48 flex items-center justify-center text-sm text-slate-500">
+            {t.analytics.failedToLoad}
+          </div>
+        )}
+
+        {!isLoading && !isError && chartData.length === 0 && (
+          <div className="h-48 flex items-center justify-center text-sm text-slate-500">
+            {t.analytics.noData}
+          </div>
+        )}
+
+        {!isLoading && !isError && chartData.length > 0 && (
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+              <XAxis
+                dataKey="date"
+                tickFormatter={(v) => formatAxisDate(v, locale)}
+                tick={{ fontSize: 10, fill: '#64748b' }}
+                stroke="#475569"
+                tickLine={false}
+                minTickGap={40}
+              />
+              <YAxis
+                domain={['auto', 'auto']}
+                tick={{ fontSize: 10, fill: '#64748b' }}
+                stroke="#475569"
+                tickLine={false}
+                width={50}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#1e293b',
+                  border: '1px solid #334155',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                }}
+                labelFormatter={(label) => formatTooltipDate(String(label), locale)}
+                formatter={(value) => [
+                  Number(value).toLocaleString(locale, { maximumFractionDigits: 4 }),
+                  config.label,
+                ]}
+              />
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke={config.color}
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 4, fill: config.color }}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+
+        <div className="flex items-center justify-between mt-2">
+          <p className="text-[10px] text-slate-600">
+            {data?.last_updated && (
+              <>
+                {t.analytics.lastUpdated}: {new Date(data.last_updated).toLocaleDateString(locale)}
+                {' | '}
+                {points.length} {t.analytics.dataPoints}
+              </>
+            )}
+          </p>
+          <GranularitySelector value={granularity} onChange={setGranularity} />
         </div>
-      )}
-
-      {isError && (
-        <div className="h-48 flex items-center justify-center text-sm text-slate-500">
-          {t.analytics.failedToLoad}
-        </div>
-      )}
-
-      {!isLoading && !isError && chartData.length === 0 && (
-        <div className="h-48 flex items-center justify-center text-sm text-slate-500">
-          {t.analytics.noData}
-        </div>
-      )}
-
-      {!isLoading && !isError && chartData.length > 0 && (
-        <ResponsiveContainer width="100%" height={200}>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-            <XAxis
-              dataKey="date"
-              tickFormatter={(v) => formatAxisDate(v, locale)}
-              tick={{ fontSize: 10, fill: '#64748b' }}
-              stroke="#475569"
-              tickLine={false}
-              minTickGap={40}
-            />
-            <YAxis
-              domain={['auto', 'auto']}
-              tick={{ fontSize: 10, fill: '#64748b' }}
-              stroke="#475569"
-              tickLine={false}
-              width={50}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: '#1e293b',
-                border: '1px solid #334155',
-                borderRadius: '8px',
-                fontSize: '12px',
-              }}
-              labelFormatter={(label) => formatTooltipDate(String(label), locale)}
-              formatter={(value) => [
-                Number(value).toLocaleString(locale, { maximumFractionDigits: 4 }),
-                config.label,
-              ]}
-            />
-            <Line
-              type="monotone"
-              dataKey="value"
-              stroke={config.color}
-              strokeWidth={2}
-              dot={false}
-              activeDot={{ r: 4, fill: config.color }}
-              isAnimationActive={false}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      )}
-
-      {data?.last_updated && (
-        <p className="text-[10px] text-slate-600 mt-2">
-          {t.analytics.lastUpdated}: {new Date(data.last_updated).toLocaleDateString(locale)}
-          {' | '}
-          {points.length} {t.analytics.dataPoints}
-        </p>
-      )}
+      </div>
     </div>
   );
 }

@@ -35,6 +35,7 @@ from api.dependencies import (
     verify_sync_token,
 )
 from api.models import (
+    ChartGranularity,
     HealthResponse,
     InsightRecord,
     InsightResponse,
@@ -269,8 +270,25 @@ async def query_usage() -> dict[str, object]:
 
 
 @app.get("/api/metrics/{series}")
-async def get_metrics(series: str, after: str | None = None) -> MetricsResponse:
-    rows = await query_gold_series(series, after=after)
+async def get_metrics(
+    series: str,
+    after: str | None = None,
+    group_by: str | None = None,
+) -> MetricsResponse:
+    # Resolve effective granularity: explicit param > config default > "day"
+    if group_by is None:
+        cfg = get_domain_config()
+        series_cfg = cfg.series.get(series)
+        effective = series_cfg.chart_granularity if series_cfg else "day"
+    else:
+        effective = group_by
+
+    try:
+        granularity = ChartGranularity(effective)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid group_by: {effective}")
+
+    rows = await query_gold_series(series, after=after, group_by=granularity.value)
     if not rows:
         raise HTTPException(status_code=404, detail=f"Series '{series}' not found")
 
@@ -290,6 +308,7 @@ async def get_metrics(series: str, after: str | None = None) -> MetricsResponse:
         series=series,
         data_points=data_points,
         last_updated=data_points[-1].date if data_points else None,
+        aggregation=granularity,
     )
 
 

@@ -141,44 +141,64 @@ async def _read_gold_bytes(series: str) -> bytes | None:
     return parquet_path.read_bytes()
 
 
-def _query_parquet_bytes(parquet_bytes: bytes, after: str | None) -> list[dict[str, Any]]:
+def _query_parquet_bytes(
+    parquet_bytes: bytes,
+    after: str | None,
+    group_by: str | None = None,
+) -> list[dict[str, Any]]:
     """Query in-memory parquet bytes with DuckDB.
 
     When a date filter returns no rows but the dataset contains data
     (e.g. annual World Bank series filtered by a 1-year window),
     falls back to returning all available data points.
+
+    When ``group_by`` is "week", "month", or "year", data is aggregated
+    using DATE_TRUNC + AVG.  "day" (or None) skips aggregation.
     """
     table = pq.read_table(io.BytesIO(parquet_bytes))
     conn = duckdb.connect()
     conn.register("gold", table)
 
     columns = ["date", "value", "series"]
+    needs_agg = group_by and group_by != "day"
+
+    if needs_agg:
+        select_clause = (
+            f"DATE_TRUNC('{group_by}', date) AS date, "
+            "ROUND(AVG(value), 4) AS value, "
+            "FIRST(series) AS series"
+        )
+        group_clause = "GROUP BY 1 ORDER BY 1"
+    else:
+        select_clause = "date, value, series"
+        group_clause = "ORDER BY date"
 
     if after:
-        result = conn.execute(
-            "SELECT date, value, series FROM gold WHERE CAST(date AS DATE) >= CAST(? AS DATE) ORDER BY date",
-            [after],
-        ).fetchall()
+        where = "WHERE CAST(date AS DATE) >= CAST(? AS DATE)"
+        sql = f"SELECT {select_clause} FROM gold {where} {group_clause}"
+        result = conn.execute(sql, [after]).fetchall()
         if not result:
             # Fallback: return all data when filter excludes everything
-            result = conn.execute(
-                "SELECT date, value, series FROM gold ORDER BY date"
-            ).fetchall()
+            sql_all = f"SELECT {select_clause} FROM gold {group_clause}"
+            result = conn.execute(sql_all).fetchall()
     else:
-        result = conn.execute(
-            "SELECT date, value, series FROM gold ORDER BY date"
-        ).fetchall()
+        sql = f"SELECT {select_clause} FROM gold {group_clause}"
+        result = conn.execute(sql).fetchall()
 
     conn.close()
     return [dict(zip(columns, row)) for row in result]
 
 
-async def query_gold_series(series: str, after: str | None = None) -> list[dict[str, Any]]:
+async def query_gold_series(
+    series: str,
+    after: str | None = None,
+    group_by: str | None = None,
+) -> list[dict[str, Any]]:
     """Query gold Parquet for a given series, optionally filtered by date."""
     data = await _read_gold_bytes(series)
     if data is None:
         return []
-    return _query_parquet_bytes(data, after)
+    return _query_parquet_bytes(data, after, group_by=group_by)
 
 
 # --- Quality report reading ---

@@ -84,6 +84,7 @@ class SeriesDisplayConfig(BaseModel):
     domain: str
     description: LocalizedStr
     keywords: list[str]
+    chart_granularity: str = "day"
 
 
 class LandingFeatureConfig(BaseModel):

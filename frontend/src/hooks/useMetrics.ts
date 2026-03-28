@@ -21,12 +21,12 @@ import type {
   TimeRange,
 } from '@/lib/api';
 
-export function useMetrics(series: string, range: TimeRange = 'ALL') {
+export function useMetrics(series: string, range: TimeRange = 'ALL', groupBy?: string | null) {
   const after = getAfterDate(range);
 
   return useQuery<MetricsResponse>({
-    queryKey: ['metrics', series, range],
-    queryFn: () => fetchMetrics(series, after),
+    queryKey: ['metrics', series, range, groupBy ?? null],
+    queryFn: () => fetchMetrics(series, after, groupBy),
     staleTime: 5 * 60 * 1000,
     retry: 2,
   });

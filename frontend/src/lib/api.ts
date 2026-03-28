@@ -15,10 +15,13 @@ export interface MetricDataPoint {
   unit?: string;
 }
 
+export type ChartGranularity = 'day' | 'week' | 'month' | 'year';
+
 export interface MetricsResponse {
   series: string;
   data_points: MetricDataPoint[];
   last_updated: string | null;
+  aggregation?: ChartGranularity;
 }
 
 export interface HealthResponse {
@@ -176,9 +179,16 @@ export function getSeriesLabel(seriesId: string): string {
 
 // --- Fetchers ---
 
-export const fetchMetrics = (series: string, after?: string | null): Promise<MetricsResponse> => {
-  const params = after ? `?after=${after}` : '';
-  return fetchJSON(`/api/metrics/${series}${params}`);
+export const fetchMetrics = (
+  series: string,
+  after?: string | null,
+  groupBy?: string | null,
+): Promise<MetricsResponse> => {
+  const params = new URLSearchParams();
+  if (after) params.set('after', after);
+  if (groupBy) params.set('group_by', groupBy);
+  const qs = params.toString();
+  return fetchJSON(`/api/metrics/${series}${qs ? `?${qs}` : ''}`);
 };
 
 export const fetchHealth = (): Promise<HealthResponse> =>
@@ -221,6 +231,7 @@ export interface SeriesConfig {
   /** Hours without a new data point before the series is considered stale.
    *  Stale = 1× threshold, Critical = 2× threshold. */
   freshnessHours: number;
+  chartGranularity: ChartGranularity;
 }
 
 // --- Run History types ---
@@ -260,7 +271,7 @@ export interface RunHistoryResponse {
 
 /** Build SERIES array from domain config. */
 export function buildSeriesFromConfig(
-  series: Record<string, { label: { en: string; pt: string }; unit: string; source: string; color: string; freshness_hours: number }>,
+  series: Record<string, { label: { en: string; pt: string }; unit: string; source: string; color: string; freshness_hours: number; chart_granularity?: string }>,
   language: 'en' | 'pt' = 'en',
 ): SeriesConfig[] {
   return Object.entries(series).map(([id, s]) => ({
@@ -270,6 +281,7 @@ export function buildSeriesFromConfig(
     source: s.source,
     color: s.color,
     freshnessHours: s.freshness_hours,
+    chartGranularity: (s.chart_granularity ?? 'day') as ChartGranularity,
   }));
 }
 

@@ -40,9 +40,9 @@ function DataCitations({ response, t }: { response: QueryResponse; t: Translatio
       </p>
       <div className="space-y-1">
         {response.data_points.map((dp, i) => (
-          <div key={i} className="flex items-center justify-between text-xs">
+          <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-x-4 items-center text-xs">
             <span className="text-slate-400">{getSeriesLabel(dp.series)}</span>
-            <span className="text-slate-300 font-medium">
+            <span className="text-slate-300 font-medium text-right">
               {dp.value.toLocaleString('en-US', { maximumFractionDigits: 4 })}
             </span>
             <span className="text-slate-500">{dp.date}</span>

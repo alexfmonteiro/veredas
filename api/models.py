@@ -498,7 +498,7 @@ class PublicDataSource(BaseModel):
 class PublicSeriesConfig(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    label: str
+    label: PublicLocalizedStr
     unit: str
     source: str
     color: str

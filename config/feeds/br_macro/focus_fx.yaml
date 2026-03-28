@@ -5,12 +5,12 @@ status: active
 
 source:
   type: api
-  url: "https://olinda.bcb.gov.br/olinda/servico/Expectativas/versao/v1/odata/ExpectativasMercadoAnuais?$top=52&$format=json&$filter=Indicador%20eq%20'C%C3%A2mbio'%20and%20DataReferencia%20eq%20'2026'&$orderby=Data%20desc"
+  url: "https://olinda.bcb.gov.br/olinda/servico/Expectativas/versao/v1/odata/ExpectativasMercadoAnuais?$top=52&$format=json&$filter=Indicador%20eq%20'C%C3%A2mbio'%20and%20DataReferencia%20eq%20'2026'%20and%20baseCalculo%20eq%200&$orderby=Data%20desc"
   format: json
   auth_method: none
   json_data_path: "value"
   rate_limit_rpm: 30
-  backfill_url: "https://olinda.bcb.gov.br/olinda/servico/Expectativas/versao/v1/odata/ExpectativasMercadoAnuais?$top=5000&$format=json&$filter=Indicador%20eq%20'C%C3%A2mbio'&$orderby=Data%20desc"
+  backfill_url: "https://olinda.bcb.gov.br/olinda/servico/Expectativas/versao/v1/odata/ExpectativasMercadoAnuais?$top=5000&$format=json&$filter=Indicador%20eq%20'C%C3%A2mbio'%20and%20DataReferencia%20eq%20'2026'%20and%20baseCalculo%20eq%200&$orderby=Data%20desc"
 
 schedule:
   cron: "0 10 * * 1"

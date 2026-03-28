@@ -652,3 +652,47 @@ async def test_auth_api_key_missing_env_raises(
     # Should fail gracefully (warning, not crash)
     assert result.success is False
     assert any("MISSING_KEY" in w for w in result.warnings)
+
+
+@pytest.mark.asyncio()
+async def test_ingestion_backfill_yearly_urls(
+    storage: LocalStorageBackend,
+) -> None:
+    """Yearly backfill should fetch one URL per year using {year} placeholder."""
+    csv_data = "din_instante;val_cargaenergiamwmed\n2024-01-01;70000.5"
+    feed_dict = {
+        "feed_id": "ons_test",
+        "name": "ONS Test",
+        "source": {
+            "type": "api",
+            "url": "https://example.com/CARGA_2026.csv",
+            "format": "csv",
+            "csv_separator": ";",
+            "backfill_url": "https://example.com/CARGA_{year}.csv",
+            "backfill_start_year": 2024,
+        },
+        "schema_fields": [
+            {"name": "din_instante", "source_field": "din_instante", "type": "string", "required": True},
+            {"name": "val_cargaenergiamwmed", "source_field": "val_cargaenergiamwmed", "type": "string", "required": True},
+        ],
+    }
+    feed = FeedConfig.model_validate(feed_dict, strict=False)
+    configs = {"ons_test": feed}
+
+    called_urls: list[str] = []
+
+    async def mock_get(url: str, **kwargs: object) -> MagicMock:
+        called_urls.append(url)
+        return _make_response(text_data=csv_data)
+
+    client = AsyncMock()
+    client.get = AsyncMock(side_effect=mock_get)
+
+    task = IngestionTask(storage=storage, feed_configs=configs, http_client=client, backfill=True)
+    result = await task.run()
+
+    assert result.success is True
+    # Should fetch 2024, 2025, 2026 (start_year to current year)
+    assert len(called_urls) >= 2
+    assert any("2024" in u for u in called_urls)
+    assert any("2025" in u for u in called_urls)

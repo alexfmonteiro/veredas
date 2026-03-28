@@ -1,17 +1,17 @@
 feed_id: ons_electricity
 name: "ONS Daily Electricity Load"
 version: "1.0.0"
-status: paused  # ONS 2026 resource not published yet; re-enable when available
+status: active
 
-# NOTE: ONS resource IDs change per year. Update the URL annually.
-# To find current resource: https://dados.ons.org.br/api/3/action/package_show?id=carga-energia
 source:
   type: api
-  url: "https://dados.ons.org.br/dataset/carga-energia/resource/d013312e-d836-4d94-86d4-1f279beaecf2/download/CARGA_ENERGIA_2026.csv"
+  url: "https://ons-aws-prod-opendata.s3.amazonaws.com/dataset/carga_energia_di/CARGA_ENERGIA_2026.csv"
   format: csv
   csv_separator: ";"
   auth_method: none
   rate_limit_rpm: 10
+  backfill_url: "https://ons-aws-prod-opendata.s3.amazonaws.com/dataset/carga_energia_di/CARGA_ENERGIA_{year}.csv"
+  backfill_start_year: 2000
 
 schedule:
   cron: "0 8 * * *"

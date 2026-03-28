@@ -128,6 +128,9 @@ class IngestionTask(BaseTask):
         if self._backfill and feed.source.backfill_url and feed.source.backfill_window_years and feed.source.backfill_start_date:
             return await self._fetch_windowed(client, feed)
 
+        if self._backfill and feed.source.backfill_url and feed.source.backfill_start_year and "{year}" in feed.source.backfill_url:
+            return await self._fetch_yearly(client, feed)
+
         url = feed.source.url
         if self._backfill and feed.source.backfill_url:
             url = feed.source.backfill_url
@@ -224,6 +227,71 @@ class IngestionTask(BaseTask):
             windows=len(windows),
             total_records=len(unique_records),
             duplicates_removed=len(all_records) - len(unique_records),
+        )
+
+        return await self._write_bronze(unique_records, feed)
+
+    async def _fetch_yearly(self, client: Any, feed: FeedConfig) -> tuple[int, SeriesReconciliation]:
+        """Fetch data from yearly URL templates (e.g. ONS per-year CSVs)."""
+        assert feed.source.backfill_url is not None
+        assert feed.source.backfill_start_year is not None
+
+        now = datetime.now(timezone.utc)
+        max_retries = feed.schedule.retry_attempts
+        retry_delay = feed.schedule.retry_delay_seconds
+        all_records: list[dict[str, Any]] = []
+        failed_years: list[int] = []
+
+        for year in range(feed.source.backfill_start_year, now.year + 1):
+            url = feed.source.backfill_url.format(year=year)
+            logger.info("backfill_year_fetch", feed_id=feed.feed_id, year=year)
+            last_exc: Exception | None = None
+            for attempt in range(1, max_retries + 1):
+                try:
+                    response = await client.get(url)
+                    response.raise_for_status()
+                    records = self._parse_response(response, feed)
+                    all_records.extend(records)
+                    last_exc = None
+                    break
+                except Exception as exc:
+                    last_exc = exc
+                    if attempt < max_retries:
+                        logger.info(
+                            "backfill_year_retry",
+                            feed_id=feed.feed_id,
+                            year=year,
+                            attempt=attempt,
+                            error=str(last_exc),
+                        )
+                        await asyncio.sleep(retry_delay)
+            if last_exc is not None:
+                logger.warning(
+                    "backfill_year_failed",
+                    feed_id=feed.feed_id,
+                    year=year,
+                    error=str(last_exc),
+                )
+                failed_years.append(year)
+
+        if not all_records:
+            raise ValueError(f"Empty yearly backfill from {feed.feed_id}")
+
+        # Deduplicate by all field values
+        seen: set[str] = set()
+        unique_records: list[dict[str, Any]] = []
+        for record in all_records:
+            key = json.dumps(record, sort_keys=True, default=str)
+            if key not in seen:
+                seen.add(key)
+                unique_records.append(record)
+
+        logger.info(
+            "backfill_yearly_complete",
+            feed_id=feed.feed_id,
+            years_fetched=now.year + 1 - feed.source.backfill_start_year - len(failed_years),
+            years_failed=len(failed_years),
+            total_records=len(unique_records),
         )
 
         return await self._write_bronze(unique_records, feed)

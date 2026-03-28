@@ -270,6 +270,7 @@ class FeedSourceConfig(BaseModel):
     backfill_url: str | None = None
     backfill_window_years: int | None = None
     backfill_start_date: str | None = None
+    backfill_start_year: int | None = None
 
 
 class FeedFieldDefinition(BaseModel):
